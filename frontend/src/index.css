@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  TyreStock — Light Industrial design tokens.
+  OKLCH channels stored as "L C H" so Tailwind can inject <alpha-value>:
+  e.g. bg-primary/90 -> oklch(var(--primary) / 0.9). See DESIGN.md.
+*/
+@layer base {
+  :root {
+    /* Neutrals — cool steel */
+    --background: 0.985 0.002 250;
+    --foreground: 0.225 0.012 256;
+    --card: 1 0 0;
+    --card-foreground: 0.225 0.012 256;
+    --popover: 1 0 0;
+    --popover-foreground: 0.225 0.012 256;
+    --surface-2: 0.966 0.004 250;
+    --secondary: 0.945 0.005 250;
+    --secondary-foreground: 0.25 0.012 256;
+    --muted: 0.955 0.004 250;
+    --muted-foreground: 0.505 0.014 256;
+    --accent: 0.955 0.004 250;
+    --accent-foreground: 0.225 0.012 256;
+    --border: 0.905 0.004 250;
+    --input: 0.9 0.004 250;
+
+    /* Hazard amber — action + live state only */
+    --primary: 0.705 0.172 58;
+    --primary-foreground: 0.205 0.02 60;
+    --ring: 0.705 0.172 58;
+
+    /* Semantic state */
+    --destructive: 0.555 0.205 27;
+    --destructive-foreground: 0.99 0 0;
+    --success: 0.62 0.13 150;
+    --success-foreground: 0.99 0 0;
+    --warning: 0.7 0.16 65;
+    --warning-foreground: 0.205 0.02 60;
+
+    --radius: 0.25rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    font-feature-settings:
+      'ss01' 1,
+      'cv01' 1;
+  }
+  /* Tabular, slashed-zero numerals wherever the mono data face is used */
+  .font-mono,
+  [class*='font-mono'] {
+    font-feature-settings:
+      'tnum' 1,
+      'zero' 1,
+      'cv01' 1;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+  /* Steel-tinted focus ring offset color matches the surface, not pure white */
+  :focus-visible {
+    outline: none;
+  }
+}
+
+@layer utilities {
+  /* The industrial data treatment: tabular mono numerals */
+  .tabular {
+    font-variant-numeric: tabular-nums slashed-zero;
+    font-feature-settings:
+      'tnum' 1,
+      'zero' 1;
+  }
+}
