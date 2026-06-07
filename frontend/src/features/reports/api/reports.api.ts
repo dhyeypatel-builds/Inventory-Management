@@ -6,9 +6,17 @@ export async function getReport(name: ReportName, query: ReportQuery = {}): Prom
   return res.data.data as ReportResult;
 }
 
+export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
+
+const MIME: Record<ExportFormat, string> = {
+  csv: 'text/csv',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
+};
+
 export async function exportReport(
   name: ReportName,
-  format: 'csv' | 'pdf',
+  format: ExportFormat,
   query: ReportQuery = {},
 ): Promise<void> {
   const res = await api.get(`/reports/${name}/export`, {
@@ -16,13 +24,11 @@ export async function exportReport(
     responseType: 'blob',
   });
 
-  const ext = format === 'csv' ? 'csv' : 'pdf';
-  const mime = format === 'csv' ? 'text/csv' : 'application/pdf';
-  const blob = new Blob([res.data as BlobPart], { type: mime });
+  const blob = new Blob([res.data as BlobPart], { type: MIME[format] });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${name}-report.${ext}`;
+  a.download = `${name}-report.${format}`;
   a.click();
   URL.revokeObjectURL(url);
 }

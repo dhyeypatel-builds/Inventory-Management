@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
 import { Toaster } from '@/shared/ui/toaster';
+import { ImpersonationBanner } from '@/features/platform/components/ImpersonationBanner';
 
 /**
  * The authenticated app frame. Layout adapts across three breakpoints (I-01):
@@ -18,7 +19,9 @@ export function AppShell() {
   const { isMobile, isTablet, isDesktop } = useLayout();
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <ImpersonationBanner />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Desktop: persistent sidebar */}
       {isDesktop && (
         <aside className="w-64 shrink-0 border-r border-border">
@@ -47,6 +50,7 @@ export function AppShell() {
         </main>
         {/* Mobile: bottom navigation */}
         {isMobile && <BottomNav />}
+      </div>
       </div>
       <Toaster />
     </div>

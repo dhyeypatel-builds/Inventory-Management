@@ -26,3 +26,21 @@ export const authRateLimiter = rateLimit({
   message: errorBody('RATE_LIMITED', 'Too many authentication attempts'),
   skip: () => isTest,
 });
+
+/**
+ * Per-email OTP request limit (on top of the per-IP authRateLimiter): 5 codes
+ * per 15 minutes for a given email, so one address can't be spammed regardless
+ * of the source IP. Falls back to the IP when no email is supplied.
+ */
+export const otpRequestRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req): string => {
+    const email = (req.body?.email as string | undefined)?.toLowerCase().trim();
+    return email ? `otp:${email}` : `otp-ip:${req.ip}`;
+  },
+  message: errorBody('RATE_LIMITED', 'Too many codes requested. Try again later.'),
+  skip: () => isTest,
+});

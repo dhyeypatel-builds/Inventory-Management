@@ -1,4 +1,4 @@
-import { TrendingUp, Boxes, Package, AlertTriangle, IndianRupee } from 'lucide-react';
+import { TrendingUp, Boxes, Package, AlertTriangle, PoundSterling } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { formatCurrency } from '@/shared/lib/currency';
 import { KpiCard } from '../components/KpiCard';
@@ -42,7 +42,7 @@ export function DashboardPage() {
           title="Today's Revenue"
           value={s ? formatCurrency(s.today.revenue) : '—'}
           subtitle={s ? `${s.today.salesCount} sales` : undefined}
-          icon={IndianRupee}
+          icon={PoundSterling}
           loading={summary.isLoading}
           accent
         />

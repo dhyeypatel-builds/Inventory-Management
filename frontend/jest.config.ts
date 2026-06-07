@@ -6,6 +6,11 @@ const config: Config = {
   rootDir: '.',
   testMatch: ['<rootDir>/src/**/*.test.{ts,tsx}', '<rootDir>/test/**/*.test.{ts,tsx}'],
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
+  // Interaction-heavy tests (radix-select + userEvent, full-app route renders)
+  // are timing-sensitive. Give per-test headroom and cap workers so CPU
+  // oversubscription doesn't push them past their async timeouts.
+  testTimeout: 15000,
+  maxWorkers: '50%',
   moduleNameMapper: {
     // Must precede the generic "@/" mapping so the Vite-only env module is
     // swapped for a Jest-safe stub (avoids `import.meta` in CommonJS).

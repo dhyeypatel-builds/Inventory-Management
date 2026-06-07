@@ -29,7 +29,53 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(8).optional(),
   ADMIN_FULL_NAME: z.string().optional(),
-});
+
+  // Platform admin (master admin — seeded; lives outside all tenants, Phase 2A/2B)
+  PLATFORM_ADMIN_EMAIL: z.string().email().optional(),
+  PLATFORM_ADMIN_PASSWORD: z.string().min(8).optional(),
+  PLATFORM_ADMIN_FULL_NAME: z.string().optional(),
+
+  // Public URLs (used to build invite/login links in emails)
+  APP_URL: z.string().url().default('http://localhost:3000'),
+
+  // Email (Phase 2C). EMAIL_TRANSPORT=dev writes rendered mail to disk and logs;
+  // =smtp sends via any SMTP provider (Resend/Postmark/SES). Prod must use smtp.
+  EMAIL_TRANSPORT: z.enum(['dev', 'smtp']).default('dev'),
+  EMAIL_FROM: z.string().default('TyreStock <no-reply@tyrestock.app>'),
+  EMAIL_DEV_DIR: z.string().default('tmp/emails'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
+  // File storage (Phase 2C). STORAGE_TRANSPORT=local writes under STORAGE_LOCAL_DIR
+  // (dev); =s3 targets an S3/R2 bucket (prod — wired later). Used by logo upload.
+  STORAGE_TRANSPORT: z.enum(['local', 's3']).default('local'),
+  STORAGE_LOCAL_DIR: z.string().default('uploads'),
+  UPLOAD_MAX_BYTES: z.coerce.number().int().positive().default(2 * 1024 * 1024),
+
+  // Headless Chrome for branded PDF rendering (Phase 2D). If unset, the renderer
+  // probes common install paths; the backend Docker image installs Chromium.
+  CHROME_PATH: z.string().optional(),
+})
+  .superRefine((cfg, ctx) => {
+    // If SMTP transport is selected, its connection settings become required.
+    if (cfg.EMAIL_TRANSPORT === 'smtp') {
+      for (const key of ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS'] as const) {
+        if (!cfg[key]) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required when EMAIL_TRANSPORT=smtp`,
+          });
+        }
+      }
+    }
+  });
 
 const parsed = envSchema.safeParse(process.env);
 

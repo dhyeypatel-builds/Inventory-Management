@@ -237,9 +237,29 @@ describe('GET /api/v1/reports/:name/export', () => {
     expect(res.text.split('\r\n')[0]).toBe('SKU,Product,Brand,On Hand,Reorder Level,Rack');
   });
 
-  it('exports a valid PDF document', async () => {
+  // The branded PDF is rendered by headless Chrome (verified end-to-end with a
+  // standalone script). Here we assert the Chrome-free HTML template: branding,
+  // £ formatting, and HTML-escaping of tenant/customer values.
+  it('renders a branded report HTML template with £ formatting and escaping', async () => {
+    const { renderReportHtml } = await import('../modules/reports/templates/report-html');
+    // Fetch the report through HTTP so it runs in tenant context, then render.
+    const json = await request(app).get('/api/v1/reports/sales').set(auth());
+    expect(json.status).toBe(200);
+
+    const html = renderReportHtml(json.body.data, {
+      shopName: '<b>Acme</b> Tyres',
+      vatNumber: 'GB123456789',
+      logoDataUri: null,
+    });
+    expect(html).toContain('Grand Total');
+    expect(html).toContain('VAT GB123456789');
+    expect(html).toContain('&lt;b&gt;Acme&lt;/b&gt; Tyres'); // escaped, not raw
+    expect(html).toMatch(/£[\d,]+\.\d{2}/); // currency formatted
+  });
+
+  it('exports a real .xlsx workbook with numeric cells and a summary', async () => {
     const res = await request(app)
-      .get('/api/v1/reports/sales/export?format=pdf')
+      .get('/api/v1/reports/sales/export?format=xlsx')
       .set(auth())
       .buffer()
       .parse((response, callback) => {
@@ -249,15 +269,29 @@ describe('GET /api/v1/reports/:name/export', () => {
       });
 
     expect(res.status).toBe(200);
-    expect(res.headers['content-type']).toContain('application/pdf');
-    expect(res.headers['content-disposition']).toContain('.pdf');
-    const body = res.body as Buffer;
-    expect(body.subarray(0, 4).toString('latin1')).toBe('%PDF');
+    expect(res.headers['content-type']).toContain('spreadsheetml.sheet');
+    expect(res.headers['content-disposition']).toContain('.xlsx');
+
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(res.body as unknown as Parameters<typeof wb.xlsx.load>[0]);
+    const ws = wb.worksheets[0];
+    expect(ws).toBeTruthy();
+    // Frozen header row.
+    expect(ws.views?.[0]?.state).toBe('frozen');
+    // The Grand Total column holds real numbers (not text), £-formatted.
+    const headers = (ws.getRow(1).values as unknown[]).map((v) => String(v ?? ''));
+    const grandCol = headers.indexOf('Grand Total');
+    expect(grandCol).toBeGreaterThan(0);
+    const cell = ws.getRow(2).getCell(grandCol);
+    expect(typeof cell.value).toBe('number');
+    expect(cell.value).toBe(EXPECTED_GRAND);
+    expect(cell.numFmt).toContain('£');
   });
 
-  it('rejects an invalid export format with 400', async () => {
+  it('rejects an unsupported export format with 400', async () => {
     const res = await request(app)
-      .get('/api/v1/reports/sales/export?format=xlsx')
+      .get('/api/v1/reports/sales/export?format=txt')
       .set(auth());
     expect(res.status).toBe(400);
   });

@@ -23,7 +23,7 @@ const reportQuerySchema = z.object({
 });
 
 const exportQuerySchema = reportQuerySchema.extend({
-  format: z.enum(['csv', 'pdf']).optional(),
+  format: z.enum(['csv', 'xlsx', 'pdf']).optional(),
 });
 
 reportsRouter.get(

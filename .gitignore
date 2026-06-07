@@ -60,3 +60,7 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Local file storage + dev email output (Phase 2C)
+backend/uploads/
+backend/tmp/

@@ -14,10 +14,10 @@ function renderAt(path: string) {
 }
 
 describe('App routing', () => {
-  it('redirects an unauthenticated visit to "/" to the login screen', async () => {
+  it('shows the public landing page on an unauthenticated visit to "/"', async () => {
     const router = renderAt('/');
-    expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/login');
+    expect(await screen.findByRole('button', { name: /book a demo/i })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/');
   });
 
   it('renders the login screen directly without crashing', async () => {
@@ -25,19 +25,19 @@ describe('App routing', () => {
     expect(await screen.findByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it('shows the app shell with sidebar nav once authenticated', async () => {
+  it('redirects an authenticated visit to "/" into the dashboard shell', async () => {
     localStorage.setItem('ts_access', 'fake-access');
     localStorage.setItem('ts_refresh', 'fake-refresh');
     localStorage.setItem(
       'ts_user',
-      JSON.stringify({ id: 'u1', fullName: 'Test Admin', email: 'a@b.c', role: 'ADMIN', permissions: [] }),
+      JSON.stringify({ id: 'u1', tenantId: 't1', tenantName: 'Shop', onboardingCompletedAt: '2026-01-01T00:00:00Z', fullName: 'Test Admin', email: 'a@b.c', role: 'ADMIN', permissions: [] }),
     );
 
     const router = renderAt('/');
-    // Dashboard placeholder + sidebar nav links render.
+    // PublicRoot redirects authenticated users to /dashboard: shell + nav render.
     expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /products/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /stock alerts/i })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.location.pathname).toBe('/dashboard');
   });
 });

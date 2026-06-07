@@ -9,34 +9,49 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/ui/table';
-import { Download } from 'lucide-react';
+import { FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
 import { toast } from '@/shared/ui/use-toast';
 import { Toaster } from '@/shared/ui/toaster';
+import { formatCurrency } from '@/shared/lib/currency';
 import { useReport } from '../hooks/useReports';
-import { exportReport } from '../api/reports.api';
+import { exportReport, type ExportFormat } from '../api/reports.api';
 import { ReportSelector } from '../components/ReportSelector';
 import { DateRangePicker } from '../components/DateRangePicker';
 import type { ReportName } from '../types';
+
+// Money columns/summary keys (kept in sync with the backend report-format.ts).
+const CURRENCY_KEYS = new Set([
+  'subtotal', 'discount', 'taxTotal', 'grandTotal', 'revenue', 'totalValue', 'taxableAmount', 'taxAmount',
+]);
+const CURRENCY_SUMMARY_KEYS = new Set([
+  'totalRevenue', 'totalDiscount', 'totalTax', 'totalSubtotal', 'grandTotal', 'totalValue', 'totalTaxCollected', 'totalTaxableAmount',
+]);
+
+const EXPORTS: { format: ExportFormat; label: string; icon: typeof FileText }[] = [
+  { format: 'pdf', label: 'PDF', icon: FileType },
+  { format: 'xlsx', label: 'Excel', icon: FileSpreadsheet },
+  { format: 'csv', label: 'CSV', icon: FileText },
+];
 
 export function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<ReportName | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [exporting, setExporting] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<ExportFormat | null>(null);
 
   const query = { from: from || undefined, to: to || undefined };
   const { data: report, isLoading, isError } = useReport(selectedReport, query);
 
-  async function handleExport(format: 'csv' | 'pdf') {
+  async function handleExport(format: ExportFormat) {
     if (!selectedReport) return;
-    setExporting(true);
+    setExportingFormat(format);
     try {
       await exportReport(selectedReport, format, query);
       toast({ title: `Exported as ${format.toUpperCase()}`, variant: 'success' });
     } catch {
-      toast({ title: 'Export failed', variant: 'destructive' });
+      toast({ title: `${format.toUpperCase()} export failed`, variant: 'destructive' });
     } finally {
-      setExporting(false);
+      setExportingFormat(null);
     }
   }
 
@@ -59,27 +74,27 @@ export function ReportsPage() {
           onToChange={setTo}
         />
         {selectedReport && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={exporting}
-              onClick={() => handleExport('csv')}
-              aria-label="Export CSV"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={exporting}
-              onClick={() => handleExport('pdf')}
-              aria-label="Export PDF"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              PDF
-            </Button>
+          <div className="flex items-center gap-2">
+            <span className="mr-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Export
+            </span>
+            {EXPORTS.map(({ format, label, icon: Icon }) => (
+              <Button
+                key={format}
+                variant="outline"
+                size="sm"
+                disabled={exportingFormat !== null}
+                onClick={() => handleExport(format)}
+                aria-label={`Export ${label}`}
+              >
+                {exportingFormat === format ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Icon className="mr-2 h-4 w-4" />
+                )}
+                {label}
+              </Button>
+            ))}
           </div>
         )}
       </div>
@@ -121,7 +136,11 @@ export function ReportsPage() {
                     {k.replace(/_/g, ' ')}
                   </p>
                   <p className="font-mono tabular text-base font-semibold">
-                    {typeof v === 'number' ? v.toLocaleString('en-GB') : v}
+                    {typeof v === 'number'
+                      ? CURRENCY_SUMMARY_KEYS.has(k)
+                        ? formatCurrency(v)
+                        : v.toLocaleString('en-GB')
+                      : v}
                   </p>
                 </div>
               ))}
@@ -155,7 +174,14 @@ export function ReportsPage() {
                           key={col.key}
                           className={col.numeric ? 'text-right font-mono tabular text-sm' : undefined}
                         >
-                          {row[col.key] != null ? String(row[col.key]) : '—'}
+                          {(() => {
+                            const v = row[col.key];
+                            if (v == null || v === '') return '—';
+                            if (col.numeric && typeof v === 'number') {
+                              return CURRENCY_KEYS.has(col.key) ? formatCurrency(v) : v.toLocaleString('en-GB');
+                            }
+                            return String(v);
+                          })()}
                         </TableCell>
                       ))}
                     </TableRow>

@@ -16,3 +16,9 @@ process.env.JWT_REFRESH_EXPIRES_IN = '7d';
 process.env.AUTH_MAX_FAILED_LOGINS = '5';
 process.env.CORS_ORIGINS = 'http://localhost:3000';
 process.env.PORT = '3002'; // avoid conflict with a running dev server
+
+// Tests never send real email: force the dev transport regardless of a local
+// .env that may select SMTP (and clear any inherited SMTP creds).
+process.env.EMAIL_TRANSPORT = 'dev';
+delete process.env.SMTP_USER;
+delete process.env.SMTP_PASS;

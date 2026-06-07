@@ -26,6 +26,20 @@ Object.defineProperty(window, 'ResizeObserver', {
   value: ResizeObserverStub,
 });
 
+// The landing page uses IntersectionObserver for scroll-reveal; jsdom lacks it.
+class IntersectionObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: IntersectionObserverStub,
+});
+
 // Radix UI Select calls hasPointerCapture / scrollIntoView; jsdom lacks them.
 Object.defineProperty(window.Element.prototype, 'hasPointerCapture', {
   writable: true,

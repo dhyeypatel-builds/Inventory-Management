@@ -1,6 +1,7 @@
 import * as argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { env } from '../../config/env';
 import { prisma } from '../../db/prisma';
 import { AppError, NotFoundError, UnauthorizedError } from '../../utils/errors';
@@ -27,6 +28,10 @@ export interface AccessTokenPayload {
    * Always set for tenant-user tokens issued by `login` / refresh.
    */
   tenantId?: string;
+  /** True for platform-admin (master admin) tokens — Phase 2B. */
+  platform?: boolean;
+  /** Set on an impersonation token: the platform admin "viewing as" this tenant. */
+  impersonatedBy?: string;
 }
 
 export function signAccessToken(payload: AccessTokenPayload): string {
@@ -138,6 +143,9 @@ export async function revokeAllRefreshTokens(userId: string): Promise<void> {
 export interface UserProfile {
   id: string;
   tenantId: string;
+  tenantName: string;
+  /** null until the shop finishes the onboarding wizard (Phase 2C ON-01). */
+  onboardingCompletedAt: Date | null;
   fullName: string;
   email: string;
   role: string;
@@ -152,16 +160,84 @@ export interface LoginResult {
   user: Omit<UserProfile, 'lastLoginAt' | 'createdAt'>;
 }
 
-/** Fetches user with role+permissions for use in login and getMe. */
+/** Fetches user with tenant+role+permissions for use in login and getMe. */
 async function findUserWithPermissions(userId: string) {
   return prisma.user.findUniqueOrThrow({
     where: { id: userId },
     include: {
+      tenant: true,
       role: {
         include: { permissions: { include: { permission: true } } },
       },
     },
   });
+}
+
+const userInclude = {
+  tenant: true,
+  role: { include: { permissions: { include: { permission: true } } } },
+} as const;
+
+type LoginUser = Prisma.UserGetPayload<{ include: typeof userInclude }>;
+
+/** Loads a user (by email) with everything needed to mint a session, or null. */
+export async function loadUserForLogin(email: string): Promise<LoginUser | null> {
+  return prisma.user.findUnique({ where: { email }, include: userInclude });
+}
+
+/**
+ * Shared session finalizer used by every login method (password, OTP, Google,
+ * invite accept). Enforces the active-user + non-suspended-tenant gates, records
+ * the login, marks any open invite for this email accepted, and mints the pair.
+ */
+export async function finalizeSession(user: LoginUser): Promise<LoginResult> {
+  if (!user.isActive) {
+    throw new UnauthorizedError('Invalid credentials');
+  }
+  if (user.tenant.status === 'SUSPENDED') {
+    throw new AppError(403, 'TENANT_SUSPENDED', 'This shop account is suspended');
+  }
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { failedLogins: 0, lastLoginAt: new Date() },
+  });
+  // First successful sign-in by an invited user closes their open invite(s).
+  await prisma.invite.updateMany({
+    where: { email: user.email, acceptedAt: null },
+    data: { acceptedAt: new Date() },
+  });
+
+  const permissions = user.role.permissions.map((rp) => rp.permission.code);
+  const accessToken = signAccessToken({
+    sub: user.id,
+    role: user.role.name,
+    permissions,
+    tenantId: user.tenantId,
+  });
+  const { token: refreshToken } = await signRefreshToken(user.id);
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id,
+      tenantId: user.tenantId,
+      tenantName: user.tenant.name,
+      onboardingCompletedAt: user.tenant.onboardingCompletedAt,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role.name,
+      permissions,
+    },
+  };
+}
+
+/** Issues a session for a known user id (used by OTP/Google/invite after proof). */
+export async function issueSessionForUserId(userId: string): Promise<LoginResult> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, include: userInclude });
+  if (!user) throw new NotFoundError('User');
+  return finalizeSession(user);
 }
 
 /**
@@ -185,6 +261,12 @@ export async function login(email: string, password: string): Promise<LoginResul
     throw new AppError(401, 'ACCOUNT_LOCKED', 'Account locked due to too many failed attempts');
   }
 
+  // Passwordless users (invited owners/staff awaiting OTP/Google in 2C) cannot
+  // sign in with a password.
+  if (!user.passwordHash) {
+    throw new UnauthorizedError('Invalid credentials');
+  }
+
   const valid = await verifyPassword(user.passwordHash, password);
   if (!valid) {
     await prisma.user.update({
@@ -194,38 +276,10 @@ export async function login(email: string, password: string): Promise<LoginResul
     throw new UnauthorizedError('Invalid credentials');
   }
 
-  // Block sign-in for a suspended tenant (only after valid credentials, so the
+  // Suspended-tenant + active checks, login record, and token pair are shared
+  // with the passwordless methods (only reached after valid credentials, so the
   // tenant's status is never leaked to wrong-password attempts).
-  if (user.tenant.status === 'SUSPENDED') {
-    throw new AppError(403, 'TENANT_SUSPENDED', 'This shop account is suspended');
-  }
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { failedLogins: 0, lastLoginAt: new Date() },
-  });
-
-  const permissions = user.role.permissions.map((rp) => rp.permission.code);
-  const accessToken = signAccessToken({
-    sub: user.id,
-    role: user.role.name,
-    permissions,
-    tenantId: user.tenantId,
-  });
-  const { token: refreshToken } = await signRefreshToken(user.id);
-
-  return {
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      tenantId: user.tenantId,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role.name,
-      permissions,
-    },
-  };
+  return finalizeSession(user);
 }
 
 /** Revokes the presented refresh token (best-effort; invalid tokens are silently ignored). */
@@ -250,6 +304,8 @@ export async function getMe(userId: string): Promise<UserProfile> {
   return {
     id: user.id,
     tenantId: user.tenantId,
+    tenantName: user.tenant.name,
+    onboardingCompletedAt: user.tenant.onboardingCompletedAt,
     fullName: user.fullName,
     email: user.email,
     role: user.role.name,
@@ -270,6 +326,7 @@ export async function changePassword(
 ): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new NotFoundError('User');
+  if (!user.passwordHash) throw new UnauthorizedError('Current password is incorrect');
 
   const valid = await verifyPassword(user.passwordHash, currentPassword);
   if (!valid) throw new UnauthorizedError('Current password is incorrect');

@@ -8,14 +8,16 @@ import { TaxSettings } from '../components/TaxSettings';
 import { ReorderSettings } from '../components/ReorderSettings';
 import { BrandsManager } from '../components/BrandsManager';
 import { CategoriesManager } from '../components/CategoriesManager';
+import { DemoDataCard } from '../components/DemoDataCard';
 
-type Tab = 'company' | 'tax' | 'brands' | 'categories';
+type Tab = 'company' | 'tax' | 'brands' | 'categories' | 'data';
 
 const TABS: { label: string; value: Tab }[] = [
   { label: 'Company', value: 'company' },
   { label: 'Tax & Inventory', value: 'tax' },
   { label: 'Brands', value: 'brands' },
   { label: 'Categories', value: 'categories' },
+  { label: 'Sample data', value: 'data' },
 ];
 
 export function SettingsPage() {
@@ -122,6 +124,17 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent>
             <CategoriesManager />
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 'data' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sample data</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DemoDataCard />
           </CardContent>
         </Card>
       )}

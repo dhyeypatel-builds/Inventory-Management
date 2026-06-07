@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { errorHandler } from './middleware/error';
 import { rateLimiter } from './middleware/rateLimit';
+import { requestLogger } from './middleware/requestLogger';
 import { success } from './utils/apiResponse';
 import { NotFoundError } from './utils/errors';
 
@@ -19,6 +21,10 @@ import { alertsRouter } from './modules/alerts/alerts.routes';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
 import { settingsRouter } from './modules/settings/settings.routes';
+import { platformRouter } from './modules/platform/platform.routes';
+import { uploadsRouter } from './modules/uploads/uploads.routes';
+import { teamRouter } from './modules/team/team.routes';
+import { onboardingRouter } from './modules/onboarding/onboarding.routes';
 
 export const app = express();
 
@@ -30,7 +36,9 @@ app.use(
     credentials: true,
   }),
 );
+app.use(requestLogger);
 app.use(rateLimiter);
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -53,6 +61,10 @@ app.use('/api/v1/alerts', alertsRouter);
 app.use('/api/v1/dashboard', dashboardRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/settings', settingsRouter);
+app.use('/api/v1/platform', platformRouter);
+app.use('/api/v1/uploads', uploadsRouter);
+app.use('/api/v1/team', teamRouter);
+app.use('/api/v1/onboarding', onboardingRouter);
 
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, _res, next) => {

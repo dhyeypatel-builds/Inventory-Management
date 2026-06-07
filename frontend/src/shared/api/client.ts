@@ -1,22 +1,16 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '@/shared/api/env';
 
-// ─── Token store (localStorage) ────────────────────────────────────────────────
+// ─── Access-token store ─────────────────────────────────────────────────────────
+// Only the short-lived access token lives in JS storage. The refresh token is an
+// httpOnly cookie set by the server (never readable here) — see backend OA-04.
 
 const ACCESS_KEY = 'ts_access';
-const REFRESH_KEY = 'ts_refresh';
 
 export const tokenStore = {
   getAccess: (): string | null => localStorage.getItem(ACCESS_KEY),
-  getRefresh: (): string | null => localStorage.getItem(REFRESH_KEY),
-  set: (access: string, refresh: string): void => {
-    localStorage.setItem(ACCESS_KEY, access);
-    localStorage.setItem(REFRESH_KEY, refresh);
-  },
-  clear: (): void => {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-  },
+  set: (access: string): void => localStorage.setItem(ACCESS_KEY, access),
+  clear: (): void => localStorage.removeItem(ACCESS_KEY),
 };
 
 // ─── Forced-logout hook ─────────────────────────────────────────────────────────
@@ -30,14 +24,16 @@ export const setAuthFailureHandler = (fn: AuthFailureHandler | null): void => {
 };
 
 // ─── Axios instance ─────────────────────────────────────────────────────────────
+// withCredentials so the httpOnly refresh cookie rides along on /auth/* calls.
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
 });
 
 const isAuthEndpoint = (url?: string): boolean =>
-  !!url && (url.includes('/auth/login') || url.includes('/auth/refresh'));
+  !!url && (url.includes('/auth/login') || url.includes('/auth/refresh') || url.includes('/auth/otp'));
 
 // Attach the bearer token to every request.
 api.interceptors.request.use((config) => {
@@ -50,16 +46,15 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
-  const refreshToken = tokenStore.getRefresh();
-  if (!refreshToken) throw new Error('No refresh token available');
-
-  // Bare axios call (not `api`) to bypass the interceptors and avoid recursion.
-  const res = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
-  const { accessToken, refreshToken: newRefresh } = res.data.data as {
-    accessToken: string;
-    refreshToken: string;
-  };
-  tokenStore.set(accessToken, newRefresh);
+  // No body: the refresh token is sent automatically as the httpOnly cookie.
+  // Bare axios (not `api`) to bypass the interceptors and avoid recursion.
+  const res = await axios.post(
+    `${API_BASE_URL}/auth/refresh`,
+    {},
+    { withCredentials: true },
+  );
+  const { accessToken } = res.data.data as { accessToken: string };
+  tokenStore.set(accessToken);
   return accessToken;
 }
 
@@ -67,8 +62,8 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-// On 401: refresh once, then replay the original request. If refresh fails,
-// clear the session and notify the app.
+// On 401: refresh once (via cookie), then replay the original request. If refresh
+// fails, clear the session and notify the app.
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {

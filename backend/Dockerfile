@@ -24,6 +24,18 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Chromium for branded-PDF rendering (Phase 2D). Use the system browser instead of
+# puppeteer's bundled download; fonts incl. the £ glyph + Noto for broad coverage.
+RUN apk add --no-cache \
+      chromium \
+      nss \
+      freetype \
+      harfbuzz \
+      ca-certificates \
+      ttf-freefont \
+      font-noto
+ENV CHROME_PATH=/usr/bin/chromium-browser
+
 # Only copy what's needed at runtime
 COPY --from=deps    /app/node_modules          ./node_modules
 COPY --from=builder /app/dist                  ./dist

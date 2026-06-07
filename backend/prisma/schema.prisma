@@ -67,6 +67,7 @@ model Tenant {
   name                  String
   slug                  String       @unique
   status                TenantStatus @default(ACTIVE)
+  plan                  String       @default("standard")   // placeholder for future billing tiers
   onboardingCompletedAt DateTime?    @map("onboarding_completed_at")
   createdAt             DateTime     @default(now()) @map("created_at")
   updatedAt             DateTime     @updatedAt @map("updated_at")
@@ -86,6 +87,7 @@ model Tenant {
   auditLogs              AuditLog[]
   settings               Setting[]
   counters               TenantCounter[]
+  invites                Invite[]
 
   @@map("tenants")
 }
@@ -99,6 +101,7 @@ model PlatformAdmin {
   isActive     Boolean   @default(true) @map("is_active")
   lastLoginAt  DateTime? @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
+  identities   AuthIdentity[]
 
   @@map("platform_admins")
 }
@@ -122,6 +125,7 @@ model Role {
   description String?
   users       User[]
   permissions RolePermission[]
+  invites     Invite[]
 
   @@map("roles")
 }
@@ -152,13 +156,14 @@ model User {
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   fullName      String         @map("full_name")
   email         String         @unique @db.Citext
-  passwordHash  String         @map("password_hash")
+  passwordHash  String?        @map("password_hash")  // nullable: passwordless owners (invited; set via OTP/Google in 2C)
   roleId        Int            @map("role_id")
   role          Role           @relation(fields: [roleId], references: [id])
   isActive      Boolean        @default(true)     @map("is_active")
   lastLoginAt   DateTime?      @map("last_login_at")
   failedLogins  Int            @default(0)        @map("failed_logins")
   refreshTokens RefreshToken[]
+  identities    AuthIdentity[]
   sales         Sale[]
   createdAt     DateTime       @default(now())    @map("created_at")
   updatedAt     DateTime       @updatedAt         @map("updated_at")
@@ -497,4 +502,77 @@ model Setting {
 
   @@id([tenantId, key])
   @@map("settings")
+}
+
+// ─── Invites (Phase 2B provisioning / 2C staff invites) ─────────────────────────
+
+model Invite {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email      String    @db.Citext
+  roleId     Int       @map("role_id")
+  role       Role      @relation(fields: [roleId], references: [id])
+  token      String    @unique
+  expiresAt  DateTime  @map("expires_at")
+  acceptedAt DateTime? @map("accepted_at")
+  invitedBy  String?   @map("invited_by")     // platform admin or tenant user id
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("invites")
+}
+
+// ─── Platform audit log (Phase 2B) ──────────────────────────────────────────────
+// Append-only record of master-admin actions. Separate from per-tenant audit_logs.
+
+model PlatformAuditLog {
+  id        BigInt   @id @default(autoincrement())
+  actorId   String?  @map("actor_id")        // platform admin id
+  action    String                            // PROVISION_TENANT, SUSPEND_TENANT, IMPERSONATE_START, ...
+  tenantId  String?  @map("tenant_id")        // loose reference (no FK; append-only)
+  metadata  Json?
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("platform_audit_logs")
+}
+
+// ─── Passwordless auth (Phase 2C) ───────────────────────────────────────────────
+
+// One-time email sign-in codes. The code is stored hashed, never plaintext.
+// NOT tenant-scoped: issued/verified pre-authentication, looked up by email.
+model OtpCode {
+  id         String    @id @default(uuid())
+  email      String    @db.Citext
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@map("otp_codes")
+}
+
+// Federated identity link (e.g. Google). Resolves to a tenant user OR a platform
+// admin. NOT tenant-scoped (resolved pre-context by provider id).
+// DORMANT: Google OAuth was removed in 2C (password + OTP only). The table is
+// kept so federated sign-in can be re-added later without a destructive change.
+model AuthIdentity {
+  id         String         @id @default(uuid())
+  userId     String?        @map("user_id")
+  user       User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminId    String?        @map("admin_id")
+  admin      PlatformAdmin? @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  provider   String                                      // 'google'
+  providerId String         @map("provider_id")          // Google 'sub'
+  email      String         @db.Citext
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  @@unique([provider, providerId])
+  @@index([userId])
+  @@index([adminId])
+  @@map("auth_identities")
 }

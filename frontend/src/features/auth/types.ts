@@ -1,14 +1,8 @@
-import type { AuthUser, TokenPair } from '@/app/providers';
+import type { AuthUser } from '@/app/providers';
 
-export type { AuthUser, TokenPair };
+export type { AuthUser };
 
 export interface LoginInput {
   email: string;
   password: string;
-}
-
-export interface LoginResponse {
-  accessToken: string;
-  refreshToken: string;
-  user: AuthUser;
 }

@@ -57,7 +57,8 @@ export async function getProductTypeAttributes(typeId: number): Promise<Attribut
 }
 
 export async function listBrands(): Promise<Brand[]> {
-  const res = await api.get('/brands', { params: { pageSize: 200 } });
+  // 100 is the backend's max page size for the brands list.
+  const res = await api.get('/brands', { params: { pageSize: 100 } });
   return res.data.data as Brand[];
 }
 

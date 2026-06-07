@@ -9,6 +9,11 @@ declare global {
         permissions: string[];
         tenantId?: string; // tenant the user belongs to; absent for platform tokens
       };
+      /** Populated by the platform-auth middleware (Phase 2B). */
+      platformAdmin?: {
+        id: string;
+        impersonatingTenantId?: string;
+      };
     }
   }
 }

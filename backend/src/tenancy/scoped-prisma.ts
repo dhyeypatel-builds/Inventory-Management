@@ -36,6 +36,7 @@ const SCOPED_MODELS = new Set<string>([
   'Alert',
   'AuditLog',
   'Setting',
+  'Invite',
 ]);
 
 /** The tenant to scope to, or null to pass through unscoped. */

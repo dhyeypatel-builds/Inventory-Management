@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { Plus, Search } from 'lucide-react';
+import { Package, Plus, Search } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { Input } from '@/shared/ui/input';
 import {
   Select,
@@ -106,11 +107,27 @@ export function ProductListPage() {
         </Select>
       </div>
 
-      <ProductTable
-        products={data?.products}
-        loading={isLoading}
-        onDelete={handleDelete}
-      />
+      {!isLoading && (data?.products?.length ?? 0) === 0 && !search && !brandFilter && !typeFilter ? (
+        <EmptyState
+          icon={Package}
+          title="No products yet"
+          description="Add your first tyre to start tracking stock and selling. Pick a product type, set the SKU and price, and you're ready."
+          action={
+            <Button asChild>
+              <Link to="/products/new">
+                <Plus className="mr-2 h-4 w-4" />
+                Add product
+              </Link>
+            </Button>
+          }
+        />
+      ) : (
+        <ProductTable
+          products={data?.products}
+          loading={isLoading}
+          onDelete={handleDelete}
+        />
+      )}
 
       {/* Pagination */}
       {meta && meta.totalPages > 1 && (

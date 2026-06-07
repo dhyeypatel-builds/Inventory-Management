@@ -29,6 +29,7 @@ const PERMISSIONS = [
   'settings:read',
   'settings:write',
   'audit:read',
+  'team:manage',
 ];
 
 const BRANDS = ['Michelin', 'Dunlop', 'Pirelli', 'Continental', 'Goodyear', 'Bridgestone'];
@@ -128,8 +129,14 @@ async function main(): Promise<void> {
   // upsert here so the seed is self-sufficient after `migrate reset`.
   await prisma.tenant.upsert({
     where: { id: DEFAULT_TENANT_ID },
-    update: {},
-    create: { id: DEFAULT_TENANT_ID, name: 'Default Shop', slug: 'default' },
+    // The default shop ships with seed data, so it's considered already onboarded.
+    update: { onboardingCompletedAt: new Date() },
+    create: {
+      id: DEFAULT_TENANT_ID,
+      name: 'Default Shop',
+      slug: 'default',
+      onboardingCompletedAt: new Date(),
+    },
   });
   console.log('  ✓ default tenant');
 
@@ -171,6 +178,54 @@ async function main(): Promise<void> {
     });
   }
   console.log(`  ✓ ADMIN role with ${allPermissions.length} permissions`);
+
+  // ─── Staff roles (Phase 2C — assignable via staff invites) ─────────────────
+  const STAFF_ROLES: { name: string; description: string; permissions: string[] }[] = [
+    {
+      name: 'SALES',
+      description: 'Point of sale and customers',
+      permissions: [
+        'catalog:read', 'product:read', 'inventory:read', 'sale:read', 'sale:create',
+        'sale:cancel', 'sale:return', 'customer:read', 'customer:write', 'dashboard:read',
+        'alert:read',
+      ],
+    },
+    {
+      name: 'INVENTORY',
+      description: 'Catalog and stock management',
+      permissions: [
+        'catalog:read', 'catalog:write', 'product:read', 'product:write', 'inventory:read',
+        'inventory:write', 'alert:read', 'alert:acknowledge', 'dashboard:read', 'report:read',
+      ],
+    },
+    {
+      name: 'AUDITOR',
+      description: 'Read-only access plus reports and audit log',
+      permissions: [
+        'catalog:read', 'product:read', 'inventory:read', 'sale:read', 'customer:read',
+        'dashboard:read', 'report:read', 'report:export', 'alert:read', 'settings:read',
+        'audit:read',
+      ],
+    },
+  ];
+  const permByCode = new Map(allPermissions.map((p) => [p.code, p.id]));
+  for (const role of STAFF_ROLES) {
+    const r = await prisma.role.upsert({
+      where: { name: role.name },
+      update: { description: role.description },
+      create: { name: role.name, description: role.description },
+    });
+    for (const code of role.permissions) {
+      const permissionId = permByCode.get(code);
+      if (!permissionId) continue;
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: r.id, permissionId } },
+        update: {},
+        create: { roleId: r.id, permissionId },
+      });
+    }
+  }
+  console.log(`  ✓ ${STAFF_ROLES.length} staff roles (SALES, INVENTORY, AUDITOR)`);
 
   // ─── Admin user ────────────────────────────────────────────────────────────
   const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@tyrestock.local';

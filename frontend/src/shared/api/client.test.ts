@@ -26,8 +26,8 @@ describe('api client — 401 refresh interceptor', () => {
     delete (api.defaults as any).adapter;
   });
 
-  it('refreshes the access token on 401 and retries the original request', async () => {
-    tokenStore.set('old-access', 'refresh-1');
+  it('refreshes the access token on 401 (via cookie) and retries the original request', async () => {
+    tokenStore.set('old-access');
 
     setAdapter((config) => {
       const auth = config.headers?.Authorization;
@@ -37,8 +37,9 @@ describe('api client — 401 refresh interceptor', () => {
       return respond(config, 200, { success: true, data: 'ok' });
     });
 
+    // The refresh call carries no token in the body — the httpOnly cookie does.
     const postSpy = jest.spyOn(axios, 'post').mockResolvedValueOnce({
-      data: { data: { accessToken: 'new-access', refreshToken: 'refresh-2' } },
+      data: { data: { accessToken: 'new-access' } },
     } as AxiosResponse);
 
     const res = await api.get('/protected');
@@ -46,11 +47,10 @@ describe('api client — 401 refresh interceptor', () => {
     expect(res.data.data).toBe('ok');
     expect(postSpy).toHaveBeenCalledTimes(1);
     expect(tokenStore.getAccess()).toBe('new-access');
-    expect(tokenStore.getRefresh()).toBe('refresh-2');
   });
 
   it('clears the session and fires the auth-failure handler when refresh fails', async () => {
-    tokenStore.set('old-access', 'bad-refresh');
+    tokenStore.set('old-access');
     const onFail = jest.fn();
     setAuthFailureHandler(onFail);
 

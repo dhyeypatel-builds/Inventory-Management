@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Skeleton } from '@/shared/ui/skeleton';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Users } from 'lucide-react';
 import { Toaster } from '@/shared/ui/toaster';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { toast } from '@/shared/ui/use-toast';
 import { useCustomers, useDeleteCustomer } from '../hooks/useCustomers';
 import { CustomerTable } from '../components/CustomerTable';
@@ -79,6 +80,18 @@ export function CustomerListPage() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
+      ) : (data?.customers ?? []).length === 0 && !q ? (
+        <EmptyState
+          icon={Users}
+          title="No customers yet"
+          description="Add a customer to keep their contact details and purchase history together, or attach one at the point of sale."
+          action={
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Customer
+            </Button>
+          }
+        />
       ) : (
         <CustomerTable
           customers={data?.customers ?? []}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router';
 
 // Color tokens — light steel + hazard amber identity, zero shadcn/tailwind dependency.
 const C = {
@@ -173,18 +174,12 @@ function SaleReceipt() {
 // ── Main component ─────────────────────────────────────────────────────────────
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
-  const [name, setName] = useState('');
-  const [contact, setContact] = useState('');
-  const [formState, setFormState] = useState<'idle' | 'submitting' | 'done'>('idle');
-
-  const formSectionRef = useRef<HTMLElement>(null);
 
   const hero    = useReveal(0);
   const heroImg = useReveal(120);
   const feat1   = useReveal(0);
   const feat2   = useReveal(0);
   const feat3   = useReveal(0);
-  const cta     = useReveal(0);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -192,24 +187,9 @@ export function LandingPage() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  function scrollToForm(e: React.MouseEvent) {
-    e.preventDefault();
-    formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (formState !== 'idle') return;
-    setFormState('submitting');
-    await new Promise((r) => setTimeout(r, 1000));
-    setFormState('done');
-  }
-
   const px = 'clamp(1.5rem, 5vw, 3.5rem)';
   const sectionPy = 'clamp(4rem, 10vh, 7rem)';
 
-  // Feature sections: transform-only reveal (no opacity gating) so they're
-  // never blank in full-page headless screenshots where IO never fires.
   const revealStyle = (v: { visible: boolean }, opacity = true) =>
     ({
       ...(opacity ? { opacity: v.visible ? 1 : 0 } : {}),
@@ -247,16 +227,17 @@ export function LandingPage() {
     marginBottom: '1.5rem',
   };
 
-  const inputStyle: React.CSSProperties = {
-    flex: '1 1 160px',
-    padding: '12px 16px',
-    background: 'oklch(0.99 0.002 256)',
-    border: `1px solid ${C.border}`,
+  const ctaLink: React.CSSProperties = {
+    display: 'inline-block',
+    padding: '14px 30px',
+    background: C.amber,
+    color: C.amberFg,
+    fontSize: 15,
+    fontWeight: 700,
     borderRadius: 4,
-    color: C.ink,
-    fontSize: 14,
-    outline: 'none',
-    fontFamily: 'inherit',
+    textDecoration: 'none',
+    fontFamily: '"Archivo Variable", system-ui, sans-serif',
+    whiteSpace: 'nowrap',
   };
 
   return (
@@ -284,11 +265,11 @@ export function LandingPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ display: 'block', width: 28, height: 2, background: C.amber }} />
+          <span style={{ display: 'block', width: 32, height: 2, background: C.amber }} />
           <span
             style={{
               fontFamily: '"JetBrains Mono Variable", monospace',
-              fontSize: 11,
+              fontSize: 13,
               fontWeight: 600,
               letterSpacing: '0.22em',
               textTransform: 'uppercase',
@@ -298,8 +279,8 @@ export function LandingPage() {
             TyreStock
           </span>
         </div>
-        <button
-          onClick={scrollToForm}
+        <Link
+          to="/login"
           style={{
             padding: '8px 18px',
             background: C.amber,
@@ -307,13 +288,12 @@ export function LandingPage() {
             fontSize: 13,
             fontWeight: 700,
             borderRadius: 4,
-            border: 'none',
-            cursor: 'pointer',
+            textDecoration: 'none',
             fontFamily: 'inherit',
           }}
         >
-          Book a demo
-        </button>
+          Sign in
+        </Link>
       </header>
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
@@ -387,28 +367,9 @@ export function LandingPage() {
               Track every tyre variant, ring up sales in under a minute, and
               get low-stock alerts before the shelf is empty.
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
-              <button
-                onClick={scrollToForm}
-                style={{
-                  padding: '14px 30px',
-                  background: C.amber,
-                  color: C.amberFg,
-                  fontSize: 15,
-                  fontWeight: 700,
-                  borderRadius: 4,
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Book my demo
-              </button>
-              <span style={{ fontSize: 13, color: C.muted, fontStyle: 'italic' }}>
-                20 minutes. No commitment.
-              </span>
-            </div>
+            <Link to="/login" style={ctaLink}>
+              Sign in to your shop
+            </Link>
           </div>
 
           {/* Right — dashboard screenshot */}
@@ -509,99 +470,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ── Demo CTA ─────────────────────────────────────────────────────────── */}
-      <section
-        ref={formSectionRef}
-        style={{
-          padding: `${sectionPy} ${px}`,
-          background: C.surface,
-          borderTop: `1px solid ${C.border}`,
-        }}
-      >
-        <div
-          ref={cta.ref}
-          style={{ ...revealStyle(cta, false), maxWidth: 560, margin: '0 auto', textAlign: 'center' }}
-        >
-          <h2
-            style={{
-              fontSize: 'clamp(2rem, 5.5vw, 3.5rem)',
-              fontWeight: 800,
-              lineHeight: 1.08,
-              letterSpacing: '-0.03em',
-              marginBottom: '1rem',
-              textWrap: 'balance',
-              color: C.ink,
-            } as React.CSSProperties}
-          >
-            See it with your<br />own shop's data.
-          </h2>
-          <p style={{ fontSize: '1rem', color: C.muted, lineHeight: 1.7, marginBottom: '2.5rem' }}>
-            Book a 20-minute demo. We'll walk through the product with a
-            catalogue and stock list that matches your shop.
-          </p>
-
-          {formState === 'done' ? (
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '16px 28px',
-                background: 'oklch(0.99 0.002 256)',
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                fontSize: 14,
-                color: C.ink,
-              }}
-            >
-              <span style={{ color: C.amberText, fontSize: '1.2rem' }}>✓</span>
-              We'll be in touch within one business day.
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit}>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
-                <input
-                  type="text"
-                  placeholder="Your name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-                <input
-                  type="text"
-                  placeholder="Phone or email"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  required
-                  style={inputStyle}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={formState === 'submitting'}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  background: C.amber,
-                  color: C.amberFg,
-                  fontSize: 15,
-                  fontWeight: 700,
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: formState === 'submitting' ? 'wait' : 'pointer',
-                  fontFamily: 'inherit',
-                  opacity: formState === 'submitting' ? 0.7 : 1,
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                {formState === 'submitting' ? 'Sending...' : 'Book my demo'}
-              </button>
-            </form>
-          )}
-        </div>
-      </section>
-
       {/* ── Footer ───────────────────────────────────────────────────────────── */}
       <footer
         style={{
@@ -614,11 +482,11 @@ export function LandingPage() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ display: 'block', width: 20, height: 2, background: C.amber }} />
+          <span style={{ display: 'block', width: 24, height: 2, background: C.amber }} />
           <span
             style={{
               fontFamily: '"JetBrains Mono Variable", monospace',
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 600,
               letterSpacing: '0.22em',
               textTransform: 'uppercase',

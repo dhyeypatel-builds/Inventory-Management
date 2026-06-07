@@ -10,6 +10,7 @@ export const updateSettingsSchema = z
         phone: z.string().max(20).optional(),
         address: z.string().max(500).optional(),
         vat_number: z.string().max(20).optional(),
+        logo_url: z.string().max(500).optional(),
       })
       .strict()
       .optional(),

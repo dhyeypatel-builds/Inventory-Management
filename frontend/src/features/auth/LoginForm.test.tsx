@@ -44,24 +44,24 @@ describe('LoginForm', () => {
     expect(await screen.findByText(/password required/i)).toBeInTheDocument();
   });
 
-  it('reveals the password-reset hint without leaving the page', async () => {
-    const router = renderLogin();
+  it('offers an OTP fallback (email me a sign-in code)', async () => {
+    renderLogin();
     const user = userEvent.setup();
 
-    expect(screen.queryByText(/ask your shop admin/i)).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /forgot password/i }));
+    await user.click(screen.getByRole('button', { name: /email me a sign-in code/i }));
 
-    expect(await screen.findByText(/ask your shop admin/i)).toBeInTheDocument();
-    // Stays on the login route; no navigation, no form wipe.
-    expect(router.state.location.pathname).toBe('/login');
+    // Switches to the OTP flow.
+    expect(await screen.findByRole('button', { name: /email me a code/i })).toBeInTheDocument();
   });
 
   it('redirects to the dashboard on successful login', async () => {
     mockLogin.mockResolvedValueOnce({
       accessToken: 'access-token',
-      refreshToken: 'refresh-token',
       user: {
         id: 'u1',
+        tenantId: 't1',
+        tenantName: 'Test Shop',
+        onboardingCompletedAt: '2026-01-01T00:00:00Z',
         fullName: 'Test Admin',
         email: 'admin@example.com',
         role: 'ADMIN',
@@ -77,7 +77,7 @@ describe('LoginForm', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/');
+      expect(router.state.location.pathname).toBe('/dashboard');
     });
 
     // Dashboard placeholder is visible after redirect.
@@ -113,7 +113,7 @@ describe('LoginForm', () => {
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
-    expect(await screen.findByText(/unexpected error/i)).toBeInTheDocument();
+    expect(await screen.findByText(/something went wrong/i)).toBeInTheDocument();
   });
 
   it('does not redirect when already authenticated', () => {
@@ -121,11 +121,11 @@ describe('LoginForm', () => {
     localStorage.setItem('ts_refresh', 'existing-refresh');
     localStorage.setItem(
       'ts_user',
-      JSON.stringify({ id: 'u1', fullName: 'Admin', email: 'a@b.com', role: 'ADMIN', permissions: [] }),
+      JSON.stringify({ id: 'u1', tenantId: 't1', tenantName: 'Shop', onboardingCompletedAt: '2026-01-01T00:00:00Z', fullName: 'Admin', email: 'a@b.com', role: 'ADMIN', permissions: [] }),
     );
 
     const router = renderLogin();
-    // AuthProvider reads stored user → isAuthenticated = true → redirects away from /login
-    expect(router.state.location.pathname).toBe('/');
+    // AuthProvider reads stored user → isAuthenticated = true → LoginPage redirects to /dashboard
+    expect(router.state.location.pathname).toBe('/dashboard');
   });
 });

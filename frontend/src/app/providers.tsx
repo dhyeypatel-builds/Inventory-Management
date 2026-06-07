@@ -10,28 +10,31 @@ import {
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/shared/api/queryClient';
 import { tokenStore, setAuthFailureHandler } from '@/shared/api/client';
+import { logout as logoutApi } from '@/features/auth/api/auth.api';
+import { PlatformAuthProvider } from '@/features/platform/context/PlatformAuthProvider';
 
 // ─── Auth context ───────────────────────────────────────────────────────────────
 
 export interface AuthUser {
   id: string;
+  tenantId: string;
+  tenantName: string;
+  /** null until the shop finishes onboarding (Phase 2C). */
+  onboardingCompletedAt: string | null;
   fullName: string;
   email: string;
   role: string;
   permissions: string[];
 }
 
-export interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
-}
-
 interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  /** Persist tokens + user and mark the session authenticated. */
-  login: (tokens: TokenPair, user: AuthUser) => void;
-  /** Clear the session. */
+  /** Persist the access token + user and mark the session authenticated. */
+  login: (accessToken: string, user: AuthUser) => void;
+  /** Update the cached user (e.g. after completing onboarding). */
+  setUser: (user: AuthUser) => void;
+  /** Clear the session (also clears the server refresh cookie). */
   logout: () => void;
 }
 
@@ -48,20 +51,27 @@ function readStoredUser(): AuthUser | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() =>
+  const [user, setUserState] = useState<AuthUser | null>(() =>
     tokenStore.getAccess() ? readStoredUser() : null,
   );
 
-  const login = useCallback((tokens: TokenPair, nextUser: AuthUser) => {
-    tokenStore.set(tokens.accessToken, tokens.refreshToken);
+  const login = useCallback((accessToken: string, nextUser: AuthUser) => {
+    tokenStore.set(accessToken);
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
-    setUser(nextUser);
+    setUserState(nextUser);
+  }, []);
+
+  const setUser = useCallback((nextUser: AuthUser) => {
+    localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+    setUserState(nextUser);
   }, []);
 
   const logout = useCallback(() => {
+    void logoutApi();
     tokenStore.clear();
     localStorage.removeItem(USER_KEY);
-    setUser(null);
+    localStorage.removeItem('ts_impersonation');
+    setUserState(null);
   }, []);
 
   // A failed token refresh (in the axios interceptor) forces a logout.
@@ -69,14 +79,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthFailureHandler(() => {
       tokenStore.clear();
       localStorage.removeItem(USER_KEY);
-      setUser(null);
+      localStorage.removeItem('ts_impersonation');
+      setUserState(null);
     });
     return () => setAuthFailureHandler(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isAuthenticated: !!user, login, logout }),
-    [user, login, logout],
+    () => ({ user, isAuthenticated: !!user, login, setUser, logout }),
+    [user, login, setUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -93,7 +104,9 @@ export function useAuth(): AuthContextValue {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>{children}</AuthProvider>
+      <PlatformAuthProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </PlatformAuthProvider>
     </QueryClientProvider>
   );
 }
