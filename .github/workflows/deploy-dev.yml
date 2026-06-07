@@ -1,0 +1,31 @@
+name: Deploy — Dev
+
+on:
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    name: Deploy to dev server
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /opt/tyrestock/dev
+            git fetch origin
+            git checkout dev
+            git reset --hard origin/dev
+            docker compose \
+              -p tyrestock-dev \
+              -f docker-compose.yml \
+              -f docker-compose.dev-server.yml \
+              up --build -d --remove-orphans
+            echo "Dev deploy complete"
