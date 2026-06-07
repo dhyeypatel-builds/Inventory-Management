@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 
 /** Two-panel auth layout: dark brand panel (desktop) + content panel. */
 export function AuthShell({ title, children }: { title: string; children: ReactNode }) {
@@ -63,6 +64,12 @@ export function AuthShell({ title, children }: { title: string; children: ReactN
           <h2 className="mb-7 text-2xl font-bold tracking-tight">{title}</h2>
           {children}
         </div>
+        <Link
+          to="/admin/login"
+          className="absolute bottom-5 right-6 font-mono text-[10px] uppercase tracking-widest text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          Platform admin
+        </Link>
       </div>
     </div>
   );

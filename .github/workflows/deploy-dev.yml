@@ -23,9 +23,5 @@ jobs:
             git fetch origin
             git checkout dev
             git reset --hard origin/dev
-            docker compose \
-              -p tyrestock-dev \
-              -f docker-compose.yml \
-              -f docker-compose.dev-server.yml \
-              up --build -d --remove-orphans
+            docker compose -p tyrestock-dev up --build -d --remove-orphans
             echo "Dev deploy complete"

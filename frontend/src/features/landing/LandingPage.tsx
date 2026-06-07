@@ -496,16 +496,31 @@ export function LandingPage() {
             TyreStock
           </span>
         </div>
-        <p
-          style={{
-            fontFamily: '"JetBrains Mono Variable", monospace',
-            fontSize: 11,
-            color: C.muted,
-            margin: 0,
-          }}
-        >
-          © 2026 TyreStock
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+          <p
+            style={{
+              fontFamily: '"JetBrains Mono Variable", monospace',
+              fontSize: 11,
+              color: C.muted,
+              margin: 0,
+            }}
+          >
+            © 2026 TyreStock
+          </p>
+          <Link
+            to="/admin/login"
+            style={{
+              fontFamily: '"JetBrains Mono Variable", monospace',
+              fontSize: 10,
+              letterSpacing: '0.15em',
+              textTransform: 'uppercase',
+              color: 'oklch(0.42 0.014 256 / 0.45)',
+              textDecoration: 'none',
+            }}
+          >
+            Platform admin
+          </Link>
+        </div>
       </footer>
     </div>
   );
