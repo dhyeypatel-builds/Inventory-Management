@@ -44,15 +44,54 @@ function useReveal(delayMs = 0) {
   return { ref, visible };
 }
 
+// Tracks the user's motion preference reactively so choreography can stand down.
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduced(mq.matches);
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return reduced;
+}
+
+// Page-scoped motion CSS. Inline styles can't express :hover/:active/keyframes,
+// so the interaction + atmospheric layer lives here. Reduced-motion strips the
+// movement but keeps the shadow cue, so affordances still read.
+const MOTION_CSS = `
+.ts-cta {
+  transition: transform .2s cubic-bezier(.16,1,.3,1), box-shadow .2s cubic-bezier(.16,1,.3,1);
+}
+.ts-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 28px oklch(0.705 0.172 58 / 0.34); }
+.ts-cta:active { transform: translateY(0) scale(.97); box-shadow: 0 3px 10px oklch(0.705 0.172 58 / 0.26); }
+
+.ts-frame {
+  box-shadow: 0 24px 72px oklch(0.14 0.012 256 / 0.13);
+  transition: transform .45s cubic-bezier(.16,1,.3,1), box-shadow .45s cubic-bezier(.16,1,.3,1);
+}
+.ts-frame:hover { transform: translateY(-6px); box-shadow: 0 40px 100px oklch(0.14 0.012 256 / 0.2); }
+
+@keyframes ts-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.ts-pulse { animation: ts-pulse 2.4s cubic-bezier(.45,0,.55,1) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-cta:hover, .ts-cta:active, .ts-frame:hover { transform: none !important; }
+  .ts-cta, .ts-frame { transition: box-shadow .2s linear !important; }
+  .ts-pulse { animation: none !important; }
+}
+`;
+
 // Browser chrome — wraps screenshots with a light steel frame and depth shadow.
 function AppFrame({ src, alt }: { src: string; alt: string }) {
   return (
     <div
+      className="ts-frame"
       style={{
         overflow: 'hidden',
         borderRadius: '10px',
         border: `1px solid ${C.border}`,
-        boxShadow: '0 24px 72px oklch(0.14 0.012 256 / 0.13)',
       }}
     >
       <div
@@ -163,7 +202,7 @@ function SaleReceipt() {
             alignSelf: 'flex-start',
           }}
         >
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.amber, display: 'block', flexShrink: 0 }} />
+          <span className="ts-pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: C.amber, display: 'block', flexShrink: 0 }} />
           Bank Transfer · Confirmed
         </div>
       </div>
@@ -174,6 +213,7 @@ function SaleReceipt() {
 // ── Main component ─────────────────────────────────────────────────────────────
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
+  const reduced = usePrefersReducedMotion();
 
   const hero    = useReveal(0);
   const heroImg = useReveal(120);
@@ -190,14 +230,31 @@ export function LandingPage() {
   const px = 'clamp(1.5rem, 5vw, 3.5rem)';
   const sectionPy = 'clamp(4rem, 10vh, 7rem)';
 
-  const revealStyle = (v: { visible: boolean }, opacity = true) =>
-    ({
+  const revealStyle = (v: { visible: boolean }, opacity = true) => {
+    if (reduced) return undefined;
+    return {
       ...(opacity ? { opacity: v.visible ? 1 : 0 } : {}),
       transform: v.visible ? 'none' : 'translateY(28px)',
       transition: v.visible
         ? `${opacity ? 'opacity 0.5s ease, ' : ''}transform 0.55s cubic-bezier(0.16, 1, 0.3, 1)`
         : 'none',
-    }) as React.CSSProperties;
+    } as React.CSSProperties;
+  };
+
+  // Hero choreography: the left column reveals as a sequence (eyebrow → headline →
+  // body → CTA), each child offset by `i` so the fold composes itself on load
+  // instead of arriving as one slab. The signature page-load moment.
+  const heroChild = (i: number): React.CSSProperties | undefined => {
+    if (reduced) return undefined;
+    const delay = `${i * 90}ms`;
+    return {
+      opacity: hero.visible ? 1 : 0,
+      transform: hero.visible ? 'none' : 'translateY(18px)',
+      transition: hero.visible
+        ? `opacity 0.55s ease ${delay}, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}`
+        : 'none',
+    };
+  };
 
   const featureGrid: React.CSSProperties = {
     width: '100%',
@@ -242,6 +299,7 @@ export function LandingPage() {
 
   return (
     <div style={{ background: C.bg, color: C.ink, fontFamily: '"Archivo Variable", system-ui, sans-serif', minHeight: '100vh' }}>
+      <style>{MOTION_CSS}</style>
 
       {/* Amber brand stripe at the very top of the page */}
       <div style={{ height: 3, background: C.amber, position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }} />
@@ -281,6 +339,7 @@ export function LandingPage() {
         </div>
         <Link
           to="/login"
+          className="ts-cta"
           style={{
             padding: '8px 18px',
             background: C.amber,
@@ -317,7 +376,7 @@ export function LandingPage() {
           }}
         >
           {/* Left */}
-          <div ref={hero.ref} style={revealStyle(hero)}>
+          <div ref={hero.ref}>
             <p
               style={{
                 fontFamily: '"JetBrains Mono Variable", monospace',
@@ -327,6 +386,7 @@ export function LandingPage() {
                 textTransform: 'uppercase',
                 color: C.amberText,
                 marginBottom: '1.5rem',
+                ...heroChild(0),
               }}
             >
               Inventory · POS · Stock alerts
@@ -340,17 +400,27 @@ export function LandingPage() {
                 marginBottom: '1.5rem',
                 textWrap: 'balance',
                 color: C.ink,
+                ...heroChild(1),
               } as React.CSSProperties}
             >
               Stop guessing{' '}
-              <span
-                style={{
-                  color: C.amberText,
-                  textDecoration: `underline 3px solid ${C.amber}`,
-                  textUnderlineOffset: '5px',
-                }}
-              >
+              <span style={{ position: 'relative', color: C.amberText, whiteSpace: 'nowrap' }}>
                 what's on
+                {/* Underline draws itself in, left to right, once the headline settles. */}
+                <span
+                  aria-hidden
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: '0.05em',
+                    height: 3,
+                    background: C.amber,
+                    transformOrigin: 'left center',
+                    transform: reduced || hero.visible ? 'scaleX(1)' : 'scaleX(0)',
+                    transition: reduced ? 'none' : 'transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s',
+                  }}
+                />
               </span>
               {' '}the rack.
             </h1>
@@ -361,15 +431,18 @@ export function LandingPage() {
                 color: C.muted,
                 maxWidth: '48ch',
                 marginBottom: '2.5rem',
+                ...heroChild(2),
               }}
             >
               TyreStock replaces the paper stock book and the spreadsheet.
               Track every tyre variant, ring up sales in under a minute, and
               get low-stock alerts before the shelf is empty.
             </p>
-            <Link to="/login" style={ctaLink}>
-              Sign in to your shop
-            </Link>
+            <div style={heroChild(3)}>
+              <Link to="/login" className="ts-cta" style={ctaLink}>
+                Sign in to your shop
+              </Link>
+            </div>
           </div>
 
           {/* Right — dashboard screenshot */}

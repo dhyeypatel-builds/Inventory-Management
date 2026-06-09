@@ -64,3 +64,7 @@ temp/
 # Local file storage + dev email output (Phase 2C)
 backend/uploads/
 backend/tmp/
+
+# Internal documentation (keep README.md only)
+*.md
+!README.md
