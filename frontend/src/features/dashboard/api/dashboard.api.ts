@@ -8,7 +8,7 @@ export async function getSummary(): Promise<DashboardSummary> {
 
 export async function getSalesTrend(range = 30): Promise<SalesTrendPoint[]> {
   const res = await api.get('/dashboard/sales-trend', { params: { range } });
-  return res.data.data as SalesTrendPoint[];
+  return res.data.data.series as SalesTrendPoint[];
 }
 
 export async function getTopBrands(limit = 5): Promise<TopBrand[]> {
