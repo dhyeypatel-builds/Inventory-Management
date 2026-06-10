@@ -213,6 +213,7 @@ function SaleReceipt() {
 // ── Main component ─────────────────────────────────────────────────────────────
 export function LandingPage() {
   const [scrolled, setScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 600);
   const reduced = usePrefersReducedMotion();
 
   const hero    = useReveal(0);
@@ -225,6 +226,13 @@ export function LandingPage() {
     const onScroll = () => setScrolled(window.scrollY > 40);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 599px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
   const px = 'clamp(1.5rem, 5vw, 3.5rem)';
@@ -549,8 +557,10 @@ export function LandingPage() {
           borderTop: `1px solid ${C.border}`,
           padding: `1.5rem ${px}`,
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'flex-start' : 'center',
           justifyContent: 'space-between',
+          gap: isMobile ? 12 : 0,
           background: C.bg,
         }}
       >
@@ -569,7 +579,7 @@ export function LandingPage() {
             TyreStock
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <p
             style={{
               fontFamily: '"JetBrains Mono Variable", monospace',
