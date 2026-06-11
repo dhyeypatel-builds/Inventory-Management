@@ -26,6 +26,7 @@ import { platformRouter } from './modules/platform/platform.routes';
 import { uploadsRouter } from './modules/uploads/uploads.routes';
 import { teamRouter } from './modules/team/team.routes';
 import { onboardingRouter } from './modules/onboarding/onboarding.routes';
+import { exportsRouter } from './modules/exports/exports.routes';
 
 export const app = express();
 
@@ -69,6 +70,7 @@ app.use('/api/v1/platform', platformRouter);
 app.use('/api/v1/uploads', uploadsRouter);
 app.use('/api/v1/team', teamRouter);
 app.use('/api/v1/onboarding', onboardingRouter);
+app.use('/api/v1/exports', exportsRouter);
 
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, _res, next) => {

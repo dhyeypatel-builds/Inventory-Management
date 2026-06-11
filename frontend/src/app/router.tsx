@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
+import { ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/app/providers';
 import { AppShell } from '@/app/layout/AppShell';
 import { usePlatformAuth } from '@/features/platform/context/PlatformAuthProvider';
@@ -7,6 +8,7 @@ import { PlatformLoginPage } from '@/features/platform/pages/PlatformLoginPage';
 import { TenantListPage } from '@/features/platform/pages/TenantListPage';
 import { TenantDetailPage } from '@/features/platform/pages/TenantDetailPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
+import { AccountPage } from '@/features/auth/pages/AccountPage';
 import { InviteAcceptPage } from '@/features/auth/pages/InviteAcceptPage';
 import { OnboardingPage } from '@/features/onboarding/pages/OnboardingPage';
 import { DashboardPage } from '@/features/dashboard/pages/DashboardPage';
@@ -40,6 +42,36 @@ function RequireOnboarding() {
   return <OnboardingPage />; // redirects to /dashboard itself once complete
 }
 
+/** Friendly in-shell screen for pages the user's role can't open. */
+function AccessDenied() {
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 rounded-md border border-dashed p-8 text-center">
+      <ShieldAlert className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+      <h1 className="text-lg font-semibold">You don't have access to this page</h1>
+      <p className="max-w-sm text-sm text-muted-foreground">
+        Your role doesn't include this area. Ask the shop owner to adjust your
+        role if you need it.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Per-route permission gate. The API enforces this too — the guard just turns a
+ * raw 403 into a clear explanation for direct URL visits.
+ */
+function RequirePermission({
+  permission,
+  children,
+}: {
+  permission: string;
+  children: React.ReactNode;
+}) {
+  const { user } = useAuth();
+  if (user && !user.permissions.includes(permission)) return <AccessDenied />;
+  return <>{children}</>;
+}
+
 function PublicRoot() {
   const { isAuthenticated } = useAuth();
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
@@ -62,20 +94,22 @@ export const routes: RouteObject[] = [
   {
     element: <RequireAuth />,
     children: [
-      { path: 'dashboard', element: <DashboardPage /> },
-      { path: 'products', element: <ProductListPage /> },
-      { path: 'products/new', element: <ProductFormPage /> },
-      { path: 'products/:id/edit', element: <ProductFormPage /> },
-      { path: 'inventory', element: <InventoryListPage /> },
-      { path: 'sales', element: <SalesHistoryPage /> },
-      { path: 'sales/pos', element: <PosPage /> },
-      { path: 'purchases', element: <PurchaseHistoryPage /> },
-      { path: 'purchases/new', element: <PurchaseEntryPage /> },
-      { path: 'customers', element: <CustomerListPage /> },
-      { path: 'customers/:id', element: <CustomerDetailPage /> },
-      { path: 'reports', element: <ReportsPage /> },
-      { path: 'alerts', element: <AlertsPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      { path: 'dashboard', element: <RequirePermission permission="dashboard:read"><DashboardPage /></RequirePermission> },
+      { path: 'products', element: <RequirePermission permission="product:read"><ProductListPage /></RequirePermission> },
+      { path: 'products/new', element: <RequirePermission permission="product:write"><ProductFormPage /></RequirePermission> },
+      { path: 'products/:id/edit', element: <RequirePermission permission="product:write"><ProductFormPage /></RequirePermission> },
+      { path: 'inventory', element: <RequirePermission permission="inventory:read"><InventoryListPage /></RequirePermission> },
+      { path: 'sales', element: <RequirePermission permission="sale:read"><SalesHistoryPage /></RequirePermission> },
+      { path: 'sales/pos', element: <RequirePermission permission="sale:create"><PosPage /></RequirePermission> },
+      { path: 'purchases', element: <RequirePermission permission="purchase:read"><PurchaseHistoryPage /></RequirePermission> },
+      { path: 'purchases/new', element: <RequirePermission permission="purchase:create"><PurchaseEntryPage /></RequirePermission> },
+      { path: 'customers', element: <RequirePermission permission="customer:read"><CustomerListPage /></RequirePermission> },
+      { path: 'customers/:id', element: <RequirePermission permission="customer:read"><CustomerDetailPage /></RequirePermission> },
+      { path: 'reports', element: <RequirePermission permission="report:read"><ReportsPage /></RequirePermission> },
+      { path: 'alerts', element: <RequirePermission permission="alert:read"><AlertsPage /></RequirePermission> },
+      { path: 'settings', element: <RequirePermission permission="settings:read"><SettingsPage /></RequirePermission> },
+      // Every signed-in user can manage their own sign-in (no permission gate).
+      { path: 'account', element: <AccountPage /> },
     ],
   },
 

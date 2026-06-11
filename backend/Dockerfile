@@ -1,22 +1,35 @@
 ARG NODE_VERSION=22
 
+# Build context is the REPO ROOT (npm workspaces — the lockfile lives there):
+#   docker build -f backend/Dockerfile --target runner .
+
 # ── Stage 1: Dependencies ──────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-COPY prisma ./prisma
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/
+COPY backend/prisma ./backend/prisma
 
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts -w backend
 
 # ── Stage 2: Build ─────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
 
+# Workspace deps hoist to /app/node_modules EXCEPT where versions conflict
+# across workspaces (e.g. puppeteer-core) — those land in backend/node_modules,
+# so both trees must come along.
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY --from=deps /app/backend/node_modules ./backend/node_modules
+COPY --from=deps /app/package.json ./package.json
+COPY backend ./backend
 
-RUN npm run build && npx prisma generate
+# Generate the Prisma client BEFORE tsc — deps were installed with
+# --ignore-scripts, so the postinstall generate never ran and @prisma/client
+# has no types until we do.
+RUN npx prisma generate --schema backend/prisma/schema.prisma \
+ && npm run build -w backend
 
 # ── Stage 3: Runner (production) ───────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS runner
@@ -36,10 +49,12 @@ RUN apk add --no-cache \
       font-noto
 ENV CHROME_PATH=/usr/bin/chromium-browser
 
-# Only copy what's needed at runtime
+# Only copy what's needed at runtime. The un-hoisted backend/node_modules
+# overlay is merged INTO ./node_modules so `node dist/index.js` resolves both.
 COPY --from=deps    /app/node_modules          ./node_modules
-COPY --from=builder /app/dist                  ./dist
-COPY --from=builder /app/prisma                ./prisma
+COPY --from=deps    /app/backend/node_modules  ./node_modules
+COPY --from=builder /app/backend/dist          ./dist
+COPY --from=builder /app/backend/prisma        ./prisma
 COPY --from=builder /app/node_modules/.prisma  ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma  ./node_modules/@prisma
 

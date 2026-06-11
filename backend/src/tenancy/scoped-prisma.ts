@@ -20,8 +20,10 @@ import { getTenantContext } from './context';
  * by hand in reports / dashboard / inventory (U-03).
  */
 
-// Prisma model names (PascalCase) that carry `tenant_id`.
-const SCOPED_MODELS = new Set<string>([
+// Prisma model names (PascalCase) that carry `tenant_id`. A test
+// (scoped-models.test.ts) derives this list from the Prisma schema and fails
+// if a new tenant-owned model is added without registering it here.
+export const SCOPED_MODELS = new Set<string>([
   'User',
   'Brand',
   'Category',
@@ -41,6 +43,7 @@ const SCOPED_MODELS = new Set<string>([
   'Purchase',
   'PurchaseItem',
   'SerialNumber',
+  'TenantCounter',
 ]);
 
 /** The tenant to scope to, or null to pass through unscoped. */

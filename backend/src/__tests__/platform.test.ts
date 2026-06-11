@@ -19,7 +19,9 @@ beforeAll(async () => {
   const passwordHash = await hashPassword(PLATFORM_PASSWORD);
   await prismaBase.platformAdmin.upsert({
     where: { email: PLATFORM_EMAIL },
-    update: { passwordHash, isActive: true },
+    // Reset lockout counters: the wrong-credentials test below increments them
+    // on every run.
+    update: { passwordHash, isActive: true, failedLogins: 0, lockedUntil: null },
     create: { email: PLATFORM_EMAIL, fullName: 'Platform Test', passwordHash },
   });
   const res = await request(app)
@@ -88,6 +90,44 @@ describe('POST /api/v1/platform/auth/login', () => {
   it('rejects platform endpoints without a token (401)', async () => {
     const res = await request(app).get('/api/v1/platform/tenants');
     expect(res.status).toBe(401);
+  });
+
+  it('locks the platform account after repeated failures (generic 401s)', async () => {
+    const email = `lockout-${Date.now()}@tyrestock.test`;
+    const admin = await prismaBase.platformAdmin.create({
+      data: { email, fullName: 'Lockout Test', passwordHash: await hashPassword('Lock@12345') },
+    });
+
+    const max = Number(process.env.AUTH_MAX_FAILED_LOGINS ?? 5);
+    for (let i = 0; i < max; i += 1) {
+      const res = await request(app)
+        .post('/api/v1/platform/auth/login')
+        .send({ email, password: 'WrongPass@1' });
+      expect(res.status).toBe(401);
+      expect(res.body.error.message).toBe('Invalid credentials');
+    }
+
+    const locked = await prismaBase.platformAdmin.findUniqueOrThrow({ where: { id: admin.id } });
+    expect(locked.lockedUntil).not.toBeNull();
+
+    // Even the correct password is refused (same generic message) while locked.
+    const res = await request(app)
+      .post('/api/v1/platform/auth/login')
+      .send({ email, password: 'Lock@12345' });
+    expect(res.status).toBe(401);
+    expect(res.body.error.message).toBe('Invalid credentials');
+
+    // An expired lock clears on the next successful login.
+    await prismaBase.platformAdmin.update({
+      where: { id: admin.id },
+      data: { lockedUntil: new Date(Date.now() - 1000) },
+    });
+    const ok = await request(app)
+      .post('/api/v1/platform/auth/login')
+      .send({ email, password: 'Lock@12345' });
+    expect(ok.status).toBe(200);
+
+    await prismaBase.platformAdmin.delete({ where: { id: admin.id } });
   });
 });
 

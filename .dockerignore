@@ -1,0 +1,16 @@
+# Keep the repo-root docker build context small (backend image builds from root
+# because the npm-workspace lockfile lives here).
+.git
+node_modules
+**/node_modules
+**/dist
+frontend/dist
+backend/uploads
+backend/tmp
+backend/coverage
+*.md
+.env
+**/.env
+.claude
+.agents
+.impeccable

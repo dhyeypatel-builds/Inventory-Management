@@ -64,7 +64,18 @@ function PasswordForm({ onUseCode }: { onUseCode: (email: string) => void }) {
       {error && (
         <div role="alert" className="flex items-start gap-2.5 rounded-sm border border-destructive/40 bg-destructive/10 px-3.5 py-3 text-sm text-[oklch(0.48_0.2_27)]">
           <AlertTriangle aria-hidden className="mt-px h-4 w-4 shrink-0" />
-          <span>{serverError(error)}</span>
+          <span>
+            {serverError(error)}{' '}
+            {/* Failed/locked-out password attempts can always fall back to OTP —
+                the emailed code bypasses and clears the lockout. */}
+            <button
+              type="button"
+              onClick={() => onUseCode(getValues('email'))}
+              className="font-medium underline underline-offset-2 hover:opacity-80"
+            >
+              Email me a sign-in code instead
+            </button>
+          </span>
         </div>
       )}
 

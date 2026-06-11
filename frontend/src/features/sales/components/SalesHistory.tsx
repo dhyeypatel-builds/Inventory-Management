@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Eye } from 'lucide-react';
+import { Link } from 'react-router';
+import { Eye, ShoppingCart } from 'lucide-react';
+import { EmptyState } from '@/shared/ui/empty-state';
 import {
   Table,
   TableBody,
@@ -72,9 +74,22 @@ export function SalesHistory() {
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-          No sales found.
-        </div>
+        !from && !to ? (
+          <EmptyState
+            icon={ShoppingCart}
+            title="No sales yet"
+            description="Ring up your first sale and the invoice will appear here."
+            action={
+              <Button asChild>
+                <Link to="/sales/pos">New Sale</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+            No sales in this date range.
+          </div>
+        )
       ) : (
         <div className="rounded-md border">
           <Table>

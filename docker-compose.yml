@@ -22,8 +22,9 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Repo root: the npm-workspace lockfile lives there (see backend/Dockerfile)
+      context: .
+      dockerfile: backend/Dockerfile
       target: runner
     restart: unless-stopped
     env_file: .env

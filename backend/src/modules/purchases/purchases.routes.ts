@@ -5,6 +5,8 @@ import { validate } from '../../middleware/validate';
 import { auditLog } from '../../middleware/audit';
 import {
   createVendorSchema,
+  updateVendorSchema,
+  vendorIdSchema,
   listVendorsQuerySchema,
   createPurchaseSchema,
   listPurchasesQuerySchema,
@@ -32,6 +34,14 @@ vendorsRouter.post(
   validate({ body: createVendorSchema }),
   auditLog('vendor'),
   purchasesController.createVendor,
+);
+
+vendorsRouter.patch(
+  '/:id',
+  requirePermission('vendor:write'),
+  validate({ params: vendorIdSchema, body: updateVendorSchema }),
+  auditLog('vendor'),
+  purchasesController.updateVendor,
 );
 
 // ─── /api/v1/purchases ───────────────────────────────────────────────────────

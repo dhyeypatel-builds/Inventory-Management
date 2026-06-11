@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { LogOut, Menu } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { useAuth } from '@/app/providers';
@@ -37,7 +37,11 @@ export function Topbar({ onMenuClick, showMenuButton = false }: TopbarProps) {
 
       <div className="ml-auto flex items-center gap-3">
         {user && (
-          <div className="flex items-center gap-2.5">
+          <Link
+            to="/account"
+            aria-label="Account settings"
+            className="flex items-center gap-2.5 rounded-sm px-1.5 py-1 transition-colors hover:bg-accent"
+          >
             <span
               aria-hidden="true"
               className="grid h-8 w-8 place-items-center rounded-sm border border-border bg-surface-2 font-mono text-xs font-bold text-foreground"
@@ -50,7 +54,7 @@ export function Topbar({ onMenuClick, showMenuButton = false }: TopbarProps) {
                 {user.role}
               </span>
             </span>
-          </div>
+          </Link>
         )}
         <div className="h-6 w-px bg-border" aria-hidden="true" />
         <Button variant="outline" size="sm" onClick={handleLogout}>

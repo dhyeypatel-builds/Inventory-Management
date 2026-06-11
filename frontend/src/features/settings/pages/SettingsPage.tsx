@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Skeleton } from '@/shared/ui/skeleton';
 import { Toaster } from '@/shared/ui/toaster';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/card';
+import { useAuth } from '@/app/providers';
 import { useSettings } from '../hooks/useSettings';
 import { CompanyForm } from '../components/CompanyForm';
 import { TaxSettings } from '../components/TaxSettings';
@@ -9,20 +10,27 @@ import { ReorderSettings } from '../components/ReorderSettings';
 import { BrandsManager } from '../components/BrandsManager';
 import { CategoriesManager } from '../components/CategoriesManager';
 import { DemoDataCard } from '../components/DemoDataCard';
+import { ExportDataCard } from '../components/ExportDataCard';
+import { TeamManager } from '../components/TeamManager';
 
-type Tab = 'company' | 'tax' | 'brands' | 'categories' | 'data';
+type Tab = 'company' | 'tax' | 'brands' | 'categories' | 'team' | 'data';
 
-const TABS: { label: string; value: Tab }[] = [
+const TABS: { label: string; value: Tab; permission?: string }[] = [
   { label: 'Company', value: 'company' },
   { label: 'Tax & Inventory', value: 'tax' },
   { label: 'Brands', value: 'brands' },
   { label: 'Categories', value: 'categories' },
+  { label: 'Team', value: 'team', permission: 'team:manage' },
   { label: 'Sample data', value: 'data' },
 ];
 
 export function SettingsPage() {
   const [tab, setTab] = useState<Tab>('company');
+  const { user } = useAuth();
   const { data: settings, isLoading, isError } = useSettings();
+  const visibleTabs = TABS.filter(
+    (t) => !t.permission || user?.permissions.includes(t.permission),
+  );
 
   return (
     <div className="space-y-4">
@@ -34,7 +42,7 @@ export function SettingsPage() {
       </div>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Settings sections">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.value}
             type="button"
@@ -128,15 +136,36 @@ export function SettingsPage() {
         </Card>
       )}
 
-      {tab === 'data' && (
+      {tab === 'team' && (
         <Card>
           <CardHeader>
-            <CardTitle>Sample data</CardTitle>
+            <CardTitle>Team</CardTitle>
           </CardHeader>
           <CardContent>
-            <DemoDataCard />
+            <TeamManager />
           </CardContent>
         </Card>
+      )}
+
+      {tab === 'data' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Export your data</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ExportDataCard />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Sample data</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DemoDataCard />
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <Toaster />

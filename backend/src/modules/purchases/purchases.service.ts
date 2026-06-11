@@ -5,6 +5,7 @@ import { parsePagination, buildMeta } from '../../utils/pagination';
 import { reevaluateVariants } from '../alerts/alerts.service';
 import type {
   CreateVendorInput,
+  UpdateVendorInput,
   ListVendorsQuery,
   CreatePurchaseInput,
   ListPurchasesQuery,
@@ -47,6 +48,23 @@ export const createVendor = async (data: CreateVendorInput) => {
       vatNumber: data.vatNumber ?? null,
       address: data.address ?? null,
       notes: data.notes ?? null,
+    },
+  });
+};
+
+export const updateVendor = async (id: string, data: UpdateVendorInput) => {
+  const vendor = await prisma.vendor.findFirst({ where: { id, deletedAt: null } });
+  if (!vendor) throw new NotFoundError('Vendor');
+
+  return prisma.vendor.update({
+    where: { id },
+    data: {
+      ...(data.name !== undefined ? { name: data.name } : {}),
+      ...(data.phone !== undefined ? { phone: data.phone } : {}),
+      ...(data.email !== undefined ? { email: data.email } : {}),
+      ...(data.vatNumber !== undefined ? { vatNumber: data.vatNumber } : {}),
+      ...(data.address !== undefined ? { address: data.address } : {}),
+      ...(data.notes !== undefined ? { notes: data.notes } : {}),
     },
   });
 };

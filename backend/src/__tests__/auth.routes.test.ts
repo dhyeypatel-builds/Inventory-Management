@@ -104,23 +104,54 @@ describe('POST /api/v1/auth/login', () => {
     await prisma.user.update({ where: { id: testUserId }, data: { failedLogins: 0 } });
   });
 
-  it('returns 401 ACCOUNT_LOCKED after N failed attempts', async () => {
+  it('sets a time-based lock after N failed attempts', async () => {
     const max = Number(process.env.AUTH_MAX_FAILED_LOGINS ?? 5);
 
     await prisma.user.update({
       where: { id: testUserId },
-      data: { failedLogins: max },
+      data: { failedLogins: max - 1, lockedUntil: null },
+    });
+
+    // The Nth failure trips the lock.
+    await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: TEST_EMAIL, password: 'WrongPassword!' });
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: testUserId } });
+    expect(user.failedLogins).toBe(max);
+    expect(user.lockedUntil).not.toBeNull();
+    expect(user.lockedUntil!.getTime()).toBeGreaterThan(Date.now());
+
+    // While locked, even the CORRECT password gets the generic 401 — the lock
+    // must not be distinguishable from a wrong password (enumeration).
+    const res = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('UNAUTHORIZED');
+    expect(res.body.error.message).toBe('Invalid credentials');
+
+    // Unlock for subsequent tests
+    await prisma.user.update({
+      where: { id: testUserId },
+      data: { failedLogins: 0, lockedUntil: null },
+    });
+  });
+
+  it('allows login again once the lock has expired (and clears it)', async () => {
+    await prisma.user.update({
+      where: { id: testUserId },
+      data: { failedLogins: 5, lockedUntil: new Date(Date.now() - 1000) },
     });
 
     const res = await request(app)
       .post('/api/v1/auth/login')
       .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
+    expect(res.status).toBe(200);
 
-    expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe('ACCOUNT_LOCKED');
-
-    // Unlock for subsequent tests
-    await prisma.user.update({ where: { id: testUserId }, data: { failedLogins: 0 } });
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: testUserId } });
+    expect(user.failedLogins).toBe(0);
+    expect(user.lockedUntil).toBeNull();
   });
 });
 

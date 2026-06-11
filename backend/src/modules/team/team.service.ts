@@ -4,6 +4,7 @@ import { prisma } from '../../db/prisma';
 import { env } from '../../config/env';
 import { currentTenant } from '../../tenancy/context';
 import { ConflictError, NotFoundError } from '../../utils/errors';
+import { sha256Hex } from '../../utils/hash';
 import { sendInviteEmail } from '../../email';
 import type { InviteStaffInput } from './team.schema';
 
@@ -87,7 +88,14 @@ export async function inviteStaff(
         },
       });
       return tx.invite.create({
-        data: { tenantId, email: input.email, roleId: role.id, token, expiresAt, invitedBy },
+        data: {
+          tenantId,
+          email: input.email,
+          roleId: role.id,
+          tokenHash: sha256Hex(token),
+          expiresAt,
+          invitedBy,
+        },
       });
     });
   } catch (err) {
@@ -112,6 +120,57 @@ export async function inviteStaff(
     roleName: role.name,
     expiresAt: invite.expiresAt,
     createdAt: invite.createdAt,
+  };
+}
+
+/**
+ * Activates / deactivates a team member. Deactivation kills their sessions
+ * (refresh tokens revoked; the access token dies within its 15-minute TTL).
+ * Guards: you can't deactivate yourself, and a tenant must always retain at
+ * least one active ADMIN so it can't lock itself out.
+ */
+export async function setMemberActive(
+  userId: string,
+  isActive: boolean,
+  actorId: string,
+): Promise<TeamMember> {
+  if (!isActive && userId === actorId) {
+    throw new ConflictError('You cannot deactivate your own account');
+  }
+
+  const user = await prisma.user.findFirst({ where: { id: userId }, include: { role: true } });
+  if (!user) throw new NotFoundError('User');
+
+  if (!isActive && user.role.name === 'ADMIN') {
+    const otherActiveAdmins = await prisma.user.count({
+      where: { id: { not: userId }, isActive: true, role: { name: 'ADMIN' } },
+    });
+    if (otherActiveAdmins === 0) {
+      throw new ConflictError('A shop must keep at least one active admin');
+    }
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { isActive },
+    include: { role: true },
+  });
+
+  if (!isActive) {
+    await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  return {
+    id: updated.id,
+    fullName: updated.fullName,
+    email: updated.email,
+    roleName: updated.role.name,
+    isActive: updated.isActive,
+    lastLoginAt: updated.lastLoginAt,
+    pending: updated.lastLoginAt === null,
   };
 }
 

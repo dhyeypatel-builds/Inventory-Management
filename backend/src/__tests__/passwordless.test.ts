@@ -5,6 +5,7 @@ import request from 'supertest';
 import { app } from '../app';
 import { prismaBase } from '../db/prisma';
 import { hashPassword } from '../modules/auth/auth.service';
+import { sha256Hex } from '../utils/hash';
 import { setTransport } from '../email';
 import type { EmailMessage, EmailTransport } from '../email/types';
 
@@ -121,6 +122,54 @@ describe('Email OTP', () => {
   });
 });
 
+// ─── First password for passwordless users ──────────────────────────────────────
+
+describe('POST /auth/change-password (passwordless set)', () => {
+  it('lets an OTP-authenticated passwordless user set a first password', async () => {
+    const { email } = await makeUser();
+
+    // Sign in via OTP (the only method available so far).
+    await request(app).post('/api/v1/auth/otp/request').send({ email });
+    const code = codeFrom(capture.sent.find((m) => m.to === email)!);
+    const session = await request(app).post('/api/v1/auth/otp/verify').send({ email, code });
+    expect(session.status).toBe(200);
+    expect(session.body.data.user.hasPassword).toBe(false);
+    const token = session.body.data.accessToken as string;
+
+    // No currentPassword needed — there is none.
+    const set = await request(app)
+      .post('/api/v1/auth/change-password')
+      .set({ Authorization: `Bearer ${token}` })
+      .send({ newPassword: 'MyFirstPass@1' });
+    expect(set.status).toBe(204);
+
+    // Password login now works (and reports hasPassword).
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'MyFirstPass@1' });
+    expect(login.status).toBe(200);
+    expect(login.body.data.user.hasPassword).toBe(true);
+  });
+
+  it('still requires the current password once one exists', async () => {
+    const { email, userId } = await makeUser();
+    await prismaBase.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword('Existing@123') },
+    });
+    const login = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email, password: 'Existing@123' });
+    const token = login.body.data.accessToken as string;
+
+    const res = await request(app)
+      .post('/api/v1/auth/change-password')
+      .set({ Authorization: `Bearer ${token}` })
+      .send({ newPassword: 'Sneaky@12345' });
+    expect(res.status).toBe(401);
+  });
+});
+
 // ─── Invite lookup ──────────────────────────────────────────────────────────────
 
 describe('GET /auth/invite/:token', () => {
@@ -136,7 +185,7 @@ describe('GET /auth/invite/:token', () => {
         tenantId: tenant.id,
         email: `${tenant.slug}@pwl.test`,
         roleId: role.id,
-        token,
+        tokenHash: sha256Hex(token),
         expiresAt: overrides.expiresAt ?? new Date(Date.now() + 86_400_000),
         acceptedAt: overrides.acceptedAt ?? null,
       },

@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Search, Filter } from 'lucide-react';
+import { Link } from 'react-router';
+import { Search, Filter, Boxes } from 'lucide-react';
 import { Input } from '@/shared/ui/input';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { Label } from '@/shared/ui/label';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { InventoryTable } from '../components/InventoryTable';
 import { AdjustStockDialog } from '../components/AdjustStockDialog';
 import { MovementLedgerDrawer } from '../components/MovementLedgerDrawer';
@@ -75,12 +77,25 @@ export function InventoryListPage() {
         </div>
       </div>
 
-      <InventoryTable
-        items={data?.items}
-        loading={isLoading}
-        onAdjust={openAdjust}
-        onViewLedger={openLedger}
-      />
+      {!isLoading && data?.items?.length === 0 && !search && !lowStockOnly ? (
+        <EmptyState
+          icon={Boxes}
+          title="No stock yet"
+          description="Inventory appears here once you add products or receive a purchase."
+          action={
+            <Button asChild>
+              <Link to="/products/new">Add a product</Link>
+            </Button>
+          }
+        />
+      ) : (
+        <InventoryTable
+          items={data?.items}
+          loading={isLoading}
+          onAdjust={openAdjust}
+          onViewLedger={openLedger}
+        />
+      )}
 
       {/* Pagination */}
       {meta && meta.totalPages > 1 && (

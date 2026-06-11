@@ -14,27 +14,37 @@ import {
 } from 'lucide-react';
 import { cn } from '@/shared/lib/cn';
 import { Button } from '@/shared/ui/button';
+import { useAuth } from '@/app/providers';
 
-interface NavItem {
+export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
   /** Exact match for the index route so it isn't always active. */
   end?: boolean;
+  /** Permission required to see (and use) this screen. */
+  permission: string;
 }
 
 // All MVP screens.
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/products', label: 'Products', icon: Package },
-  { to: '/inventory', label: 'Inventory', icon: Boxes },
-  { to: '/sales', label: 'Sales History', icon: ShoppingCart },
-  { to: '/purchases', label: 'Purchases', icon: PackagePlus },
-  { to: '/customers', label: 'Customers', icon: Users },
-  { to: '/reports', label: 'Reports', icon: FileBarChart },
-  { to: '/alerts', label: 'Stock Alerts', icon: BellRing },
-  { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true, permission: 'dashboard:read' },
+  { to: '/products', label: 'Products', icon: Package, permission: 'product:read' },
+  { to: '/inventory', label: 'Inventory', icon: Boxes, permission: 'inventory:read' },
+  { to: '/sales', label: 'Sales History', icon: ShoppingCart, permission: 'sale:read' },
+  { to: '/purchases', label: 'Purchases', icon: PackagePlus, permission: 'purchase:read' },
+  { to: '/customers', label: 'Customers', icon: Users, permission: 'customer:read' },
+  { to: '/reports', label: 'Reports', icon: FileBarChart, permission: 'report:read' },
+  { to: '/alerts', label: 'Stock Alerts', icon: BellRing, permission: 'alert:read' },
+  { to: '/settings', label: 'Settings', icon: Settings, permission: 'settings:read' },
 ];
+
+/** Nav items the signed-in user can actually open (staff see a shorter menu). */
+export function useVisibleNavItems(): NavItem[] {
+  const { user } = useAuth();
+  const permissions = user?.permissions ?? [];
+  return NAV_ITEMS.filter((item) => permissions.includes(item.permission));
+}
 
 /** Amber tile + wordmark. The brand mark for the app. */
 export function Wordmark() {
@@ -58,6 +68,9 @@ export function Wordmark() {
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const navItems = useVisibleNavItems();
+  const canSell = user?.permissions.includes('sale:create');
 
   return (
     <nav
@@ -68,21 +81,23 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <Wordmark />
       </div>
 
-      <div className="px-3 pb-2">
-        <Button
-          className="w-full justify-start gap-2"
-          onClick={() => {
-            onNavigate?.();
-            navigate('/sales/pos');
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          New Sale
-        </Button>
-      </div>
+      {canSell && (
+        <div className="px-3 pb-2">
+          <Button
+            className="w-full justify-start gap-2"
+            onClick={() => {
+              onNavigate?.();
+              navigate('/sales/pos');
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            New Sale
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
-        {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+        {navItems.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}

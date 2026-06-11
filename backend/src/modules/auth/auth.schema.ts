@@ -17,7 +17,11 @@ export const refreshSchema = z.object({
 
 export const changePasswordSchema = z.object({
   body: z.object({
-    currentPassword: z.string().min(8, 'Current password must be at least 8 characters'),
+    // Optional: passwordless (invited) users set their first password without one.
+    currentPassword: z
+      .string()
+      .min(8, 'Current password must be at least 8 characters')
+      .optional(),
     newPassword: z.string().min(8, 'New password must be at least 8 characters'),
   }),
 });

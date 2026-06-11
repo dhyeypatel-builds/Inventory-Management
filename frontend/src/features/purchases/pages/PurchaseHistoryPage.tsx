@@ -15,9 +15,14 @@ import { Skeleton } from '@/shared/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import { formatCurrency } from '@/shared/lib/currency';
 import { formatDate, formatDateTime } from '@/shared/lib/dates';
+import { EmptyState } from '@/shared/ui/empty-state';
 import { usePurchases, usePurchase } from '../hooks/usePurchases';
+import { VendorsManager } from '../components/VendorsManager';
+
+type View = 'purchases' | 'vendors';
 
 export function PurchaseHistoryPage() {
+  const [view, setView] = useState<View>('purchases');
   const [page, setPage] = useState(1);
   const [viewId, setViewId] = useState<string | null>(null);
 
@@ -44,16 +49,47 @@ export function PurchaseHistoryPage() {
         </Button>
       </div>
 
-      {isLoading ? (
+      <div className="flex gap-2" role="tablist" aria-label="Purchases sections">
+        {([
+          { value: 'purchases', label: 'Purchases' },
+          { value: 'vendors', label: 'Vendors' },
+        ] as { value: View; label: string }[]).map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="tab"
+            aria-selected={view === t.value}
+            onClick={() => setView(t.value)}
+            className={
+              view === t.value
+                ? 'rounded-md border border-primary bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground'
+                : 'rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'vendors' ? (
+        <VendorsManager />
+      ) : isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className="h-12 w-full rounded-md" />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className="rounded-sm border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-          No purchases recorded yet. Receive your first stock with &ldquo;New Purchase&rdquo;.
-        </p>
+        <EmptyState
+          icon={PackagePlus}
+          title="No purchases yet"
+          description="Receive your first delivery and the goods-inward record will appear here."
+          action={
+            <Button asChild className="bg-success text-success-foreground hover:bg-success/90">
+              <Link to="/purchases/new">New Purchase</Link>
+            </Button>
+          }
+        />
       ) : (
         <div className="rounded-md border">
           <Table>

@@ -26,3 +26,16 @@ export const revoke = async (req: Request, res: Response, next: NextFunction): P
     next(err);
   }
 };
+
+export const updateMember = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    res.locals.auditEntityId = req.params.id as string;
+    success(res, await team.setMemberActive(req.params.id as string, req.body.isActive, req.user!.id));
+  } catch (err) {
+    next(err);
+  }
+};

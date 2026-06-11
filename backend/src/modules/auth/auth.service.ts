@@ -166,6 +166,8 @@ export interface UserProfile {
   email: string;
   role: string;
   permissions: string[];
+  /** False for passwordless (invited) users — they sign in via OTP only. */
+  hasPassword: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
 }
@@ -211,12 +213,16 @@ export async function finalizeSession(user: LoginUser): Promise<LoginResult> {
     throw new UnauthorizedError('Invalid credentials');
   }
   if (user.tenant.status === 'SUSPENDED') {
-    throw new AppError(403, 'TENANT_SUSPENDED', 'This shop account is suspended');
+    throw new AppError(
+      403,
+      'TENANT_SUSPENDED',
+      'This shop account is suspended. Please contact support to reactivate it.',
+    );
   }
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { failedLogins: 0, lastLoginAt: new Date() },
+    data: { failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() },
   });
   // First successful sign-in by an invited user closes their open invite(s).
   await prisma.invite.updateMany({
@@ -245,6 +251,7 @@ export async function finalizeSession(user: LoginUser): Promise<LoginResult> {
       email: user.email,
       role: user.role.name,
       permissions,
+      hasPassword: user.passwordHash !== null,
     },
   };
 }
@@ -256,9 +263,15 @@ export async function issueSessionForUserId(userId: string): Promise<LoginResult
   return finalizeSession(user);
 }
 
+/** How long password login stays refused after too many failures. */
+export const LOCKOUT_MINUTES = 15;
+
 /**
  * Verifies credentials, enforces lockout policy, returns token pair + profile.
- * Never exposes which field was wrong — always "Invalid credentials".
+ * Never exposes which field was wrong — always "Invalid credentials". Lockout is
+ * time-based (LOCKOUT_MINUTES) and indistinguishable from a wrong password, so
+ * tripping it can't be used to confirm an account exists; OTP login bypasses and
+ * clears it (the user proves email ownership instead).
  */
 export async function login(email: string, password: string): Promise<LoginResult> {
   const user = await prisma.user.findUnique({
@@ -273,11 +286,12 @@ export async function login(email: string, password: string): Promise<LoginResul
     throw new UnauthorizedError('Invalid credentials');
   }
 
-  if (user.failedLogins >= env.AUTH_MAX_FAILED_LOGINS) {
-    throw new AppError(401, 'ACCOUNT_LOCKED', 'Account locked due to too many failed attempts');
+  const now = new Date();
+  if (user.lockedUntil && user.lockedUntil > now) {
+    throw new UnauthorizedError('Invalid credentials');
   }
 
-  // Passwordless users (invited owners/staff awaiting OTP/Google in 2C) cannot
+  // Passwordless users (invited owners/staff awaiting OTP in 2C) cannot
   // sign in with a password.
   if (!user.passwordHash) {
     throw new UnauthorizedError('Invalid credentials');
@@ -285,9 +299,16 @@ export async function login(email: string, password: string): Promise<LoginResul
 
   const valid = await verifyPassword(user.passwordHash, password);
   if (!valid) {
+    // An expired lock means this failure starts a fresh count.
+    const priorFails = user.lockedUntil && user.lockedUntil <= now ? 0 : user.failedLogins;
+    const failedLogins = priorFails + 1;
+    const lockedUntil =
+      failedLogins >= env.AUTH_MAX_FAILED_LOGINS
+        ? new Date(now.getTime() + LOCKOUT_MINUTES * 60_000)
+        : null;
     await prisma.user.update({
       where: { id: user.id },
-      data: { failedLogins: { increment: 1 } },
+      data: { failedLogins, lockedUntil },
     });
     throw new UnauthorizedError('Invalid credentials');
   }
@@ -326,26 +347,32 @@ export async function getMe(userId: string): Promise<UserProfile> {
     email: user.email,
     role: user.role.name,
     permissions,
+    hasPassword: user.passwordHash !== null,
     lastLoginAt: user.lastLoginAt,
     createdAt: user.createdAt,
   };
 }
 
 /**
- * Changes a user's password after verifying the current one.
+ * Changes a user's password after verifying the current one. Passwordless
+ * (invited) users may SET a first password without a current one — their
+ * authenticated OTP session is the identity proof, and adding a password never
+ * removes the OTP sign-in path.
  * Revokes all refresh tokens to force re-login on all devices.
  */
 export async function changePassword(
   userId: string,
-  currentPassword: string,
+  currentPassword: string | undefined,
   newPassword: string,
 ): Promise<void> {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new NotFoundError('User');
-  if (!user.passwordHash) throw new UnauthorizedError('Current password is incorrect');
 
-  const valid = await verifyPassword(user.passwordHash, currentPassword);
-  if (!valid) throw new UnauthorizedError('Current password is incorrect');
+  if (user.passwordHash) {
+    if (!currentPassword) throw new UnauthorizedError('Current password is incorrect');
+    const valid = await verifyPassword(user.passwordHash, currentPassword);
+    if (!valid) throw new UnauthorizedError('Current password is incorrect');
+  }
 
   const newHash = await hashPassword(newPassword);
   await prisma.user.update({ where: { id: userId }, data: { passwordHash: newHash } });

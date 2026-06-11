@@ -1,6 +1,7 @@
 import { Trash2, Minus, Plus, ShoppingCart } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
+import { SerialChipsInput } from '@/shared/ui/serial-chips-input';
 import { formatCurrency } from '@/shared/lib/currency';
 import { cn } from '@/shared/lib/cn';
 import type { CartItem } from '../types';
@@ -150,12 +151,12 @@ export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, on
             </div>
 
             {onChangeSerials && (
-              <Input
-                className="h-8 font-mono text-xs"
-                placeholder="Serial nos (optional, comma-separated)"
+              <SerialChipsInput
                 value={item.serialsText ?? ''}
-                onChange={(e) => onChangeSerials(item.variantId, e.target.value)}
-                aria-label={`Serial numbers for ${item.description}`}
+                onChange={(text) => onChangeSerials(item.variantId, text)}
+                quantity={item.quantity}
+                label={`Serial numbers for ${item.description}`}
+                placeholder="Serial nos (optional)"
               />
             )}
           </div>

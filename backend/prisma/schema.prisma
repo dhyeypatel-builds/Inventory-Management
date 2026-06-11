@@ -117,6 +117,8 @@ model PlatformAdmin {
   passwordHash String?   @map("password_hash")
   isActive     Boolean   @default(true) @map("is_active")
   lastLoginAt  DateTime? @map("last_login_at")
+  failedLogins Int       @default(0) @map("failed_logins")
+  lockedUntil  DateTime? @map("locked_until")
   createdAt    DateTime  @default(now()) @map("created_at")
   identities   AuthIdentity[]
 
@@ -179,6 +181,9 @@ model User {
   isActive      Boolean        @default(true)     @map("is_active")
   lastLoginAt   DateTime?      @map("last_login_at")
   failedLogins  Int            @default(0)        @map("failed_logins")
+  // Set when failedLogins crosses the threshold; password login is refused until
+  // it passes (time-based lockout — OTP login still works and clears it).
+  lockedUntil   DateTime?      @map("locked_until")
   refreshTokens RefreshToken[]
   identities    AuthIdentity[]
   sales         Sale[]
@@ -622,7 +627,9 @@ model Invite {
   email      String    @db.Citext
   roleId     Int       @map("role_id")
   role       Role      @relation(fields: [roleId], references: [id])
-  token      String    @unique
+  // sha256 hex of the raw token; the raw value only ever lives in the invite
+  // email/URL, so a DB read can't take over pending invites.
+  tokenHash  String    @unique @map("token_hash")
   expiresAt  DateTime  @map("expires_at")
   acceptedAt DateTime? @map("accepted_at")
   invitedBy  String?   @map("invited_by")     // platform admin or tenant user id

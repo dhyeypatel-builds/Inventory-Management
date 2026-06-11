@@ -8,6 +8,7 @@ import { Label } from '@/shared/ui/label';
 import { Textarea } from '@/shared/ui/textarea';
 import { Separator } from '@/shared/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import { SerialChipsInput } from '@/shared/ui/serial-chips-input';
 import { toast } from '@/shared/ui/use-toast';
 import { formatCurrency } from '@/shared/lib/currency';
 import { ItemSearch } from '@/features/sales/components/ItemSearch';
@@ -169,27 +170,18 @@ export function PurchaseEntryPage() {
                   {lines.map((l) => {
                     const lineTotal =
                       l.unitCost * l.quantity * (1 + l.taxRatePct / 100);
-                    const serialCount = parseSerials(l.serialsText).length;
-                    const tooMany = serialCount > l.quantity;
                     return (
                       <TableRow key={l.variantId}>
                         <TableCell>
                           <div className="font-medium">{l.description}</div>
-                          <Input
-                            className="mt-1.5 h-8 font-mono text-xs"
-                            placeholder="Serial nos (optional, comma-separated)"
+                          <SerialChipsInput
+                            className="mt-1.5"
                             value={l.serialsText}
-                            onChange={(e) =>
-                              updateLine(l.variantId, { serialsText: e.target.value })
-                            }
-                            aria-label={`Serial numbers for ${l.description}`}
-                            aria-invalid={tooMany}
+                            onChange={(text) => updateLine(l.variantId, { serialsText: text })}
+                            quantity={l.quantity}
+                            label={`Serial numbers for ${l.description}`}
+                            placeholder="Serial nos (optional)"
                           />
-                          {tooMany && (
-                            <p className="mt-1 text-xs text-destructive">
-                              {serialCount} serials for {l.quantity} unit{l.quantity !== 1 && 's'}
-                            </p>
-                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Input

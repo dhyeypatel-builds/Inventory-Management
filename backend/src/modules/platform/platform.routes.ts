@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requirePlatform } from '../../middleware/platform-auth';
+import { authRateLimiter } from '../../middleware/rateLimit';
 import { validate } from '../../middleware/validate';
 import { platformLoginSchema } from './platform-auth.schema';
 import { provisionTenantSchema, tenantIdSchema, listTenantsQuerySchema } from './tenants.schema';
@@ -10,8 +11,13 @@ import * as tenantCtrl from './tenants.controller';
 
 export const platformRouter = Router();
 
-// Public — platform login.
-platformRouter.post('/auth/login', validate({ body: platformLoginSchema }), authCtrl.login);
+// Public — platform login. Strictly rate-limited: this is the master-admin door.
+platformRouter.post(
+  '/auth/login',
+  authRateLimiter,
+  validate({ body: platformLoginSchema }),
+  authCtrl.login,
+);
 
 // Everything below requires a platform-admin token.
 platformRouter.get('/auth/me', requirePlatform, authCtrl.me);

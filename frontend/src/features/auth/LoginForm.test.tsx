@@ -65,7 +65,7 @@ describe('LoginForm', () => {
         fullName: 'Test Admin',
         email: 'admin@example.com',
         role: 'ADMIN',
-        permissions: [],
+        permissions: ['dashboard:read'],
       },
     });
 

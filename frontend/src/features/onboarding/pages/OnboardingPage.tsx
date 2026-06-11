@@ -7,6 +7,7 @@ import { useAuth } from '@/app/providers';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
+import { AuthedImage } from '@/shared/ui/authed-image';
 import {
   Select,
   SelectContent,
@@ -181,7 +182,7 @@ export function OnboardingPage() {
               <div className="flex items-center gap-4">
                 <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-border bg-surface-2">
                   {company.logo_url ? (
-                    <img src={company.logo_url} alt="Shop logo" className="h-full w-full object-cover" />
+                    <AuthedImage src={company.logo_url} alt="Shop logo" className="h-full w-full object-cover" />
                   ) : (
                     <Store className="h-6 w-6 text-muted-foreground" />
                   )}

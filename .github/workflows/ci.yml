@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  backend:
+    name: Backend tests + build
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tyrestock_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tyrestock_test
+      JWT_ACCESS_SECRET: ci-only-access-secret-0123456789abcdef0123456789abcdef
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-fedcba9876543210fedcba9876543210
+      ADMIN_EMAIL: admin@tyrestock.local
+      ADMIN_PASSWORD: Admin@1234
+      EMAIL_TRANSPORT: dev
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Enable citext extension
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d tyrestock_test \
+            -c 'CREATE EXTENSION IF NOT EXISTS citext;'
+
+      - name: Migrate + seed test database
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npx prisma db seed
+
+      - name: Run backend tests
+        run: npm test -w backend
+
+      - name: Type-check / build backend
+        run: npm run build -w backend
+
+  frontend:
+    name: Frontend tests + build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        run: npm test -w frontend
+
+      - name: Build frontend
+        run: npm run build -w frontend
+
+  docker:
+    name: Backend Docker image (verifies Chromium for PDF rendering)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        # Same context/target as docker-compose.yml (repo root — workspace lockfile)
+        run: docker build -f backend/Dockerfile --target runner -t tyrestock-backend:ci .
+
+      - name: Chromium present in image
+        run: docker run --rm --entrypoint sh tyrestock-backend:ci -c '"$CHROME_PATH" --version'

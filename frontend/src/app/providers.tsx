@@ -25,6 +25,9 @@ export interface AuthUser {
   email: string;
   role: string;
   permissions: string[];
+  /** False for passwordless (invited) users until they set one. Optional for
+   * sessions stored before this field existed. */
+  hasPassword?: boolean;
 }
 
 interface AuthContextValue {

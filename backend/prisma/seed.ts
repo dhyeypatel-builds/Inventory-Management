@@ -19,6 +19,7 @@ const PERMISSIONS = [
   'sale:create',
   'sale:cancel',
   'sale:return',
+  'sale:override_price', // sell below/above the listed price (ADMIN only by default)
   'customer:read',
   'customer:write',
   'purchase:read',
@@ -145,6 +146,18 @@ async function main(): Promise<void> {
   console.log('  ✓ default tenant');
 
   // ─── Platform admin (master admin — lives outside all tenants) ─────────────
+  // In production the credentials MUST come from the environment: the dev
+  // fallbacks below are public (this repo is on GitHub) and would otherwise
+  // ship a known master-admin password.
+  if (process.env.NODE_ENV === 'production') {
+    const missing = ['PLATFORM_ADMIN_EMAIL', 'PLATFORM_ADMIN_PASSWORD', 'ADMIN_EMAIL', 'ADMIN_PASSWORD']
+      .filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+      throw new Error(
+        `Refusing to seed default admin credentials in production. Set: ${missing.join(', ')}`,
+      );
+    }
+  }
   const platformEmail = process.env.PLATFORM_ADMIN_EMAIL ?? 'owner@tyrestock.app';
   const platformPassword = process.env.PLATFORM_ADMIN_PASSWORD ?? 'Platform@1234';
   const platformFullName = process.env.PLATFORM_ADMIN_FULL_NAME ?? 'Platform Owner';

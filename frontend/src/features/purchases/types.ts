@@ -3,6 +3,9 @@ export interface Vendor {
   name: string;
   phone: string | null;
   email: string | null;
+  vatNumber?: string | null;
+  address?: string | null;
+  notes?: string | null;
 }
 
 export type PurchaseStatus = 'RECEIVED' | 'CANCELLED';

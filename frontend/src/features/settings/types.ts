@@ -3,6 +3,7 @@ export interface CompanySettings {
   phone?: string;
   address?: string;
   vat_number?: string;
+  logo_url?: string;
 }
 
 export interface Settings {

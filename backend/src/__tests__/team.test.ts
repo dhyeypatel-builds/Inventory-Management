@@ -5,6 +5,7 @@ import request from 'supertest';
 import { app } from '../app';
 import { prismaBase } from '../db/prisma';
 import { hashPassword } from '../modules/auth/auth.service';
+import { sha256Hex } from '../utils/hash';
 import { setTransport } from '../email';
 import type { EmailMessage, EmailTransport } from '../email/types';
 
@@ -141,6 +142,29 @@ describe('staff invites', () => {
     expect(delB.status).toBe(404);
   });
 
+  it('stores only a hash of the invite token; the emailed link still works', async () => {
+    const owner = await makeOwner('HashShop');
+    const staffEmail = `hash-${Date.now()}@team.test`;
+    const inv = await request(app)
+      .post('/api/v1/team/invites')
+      .set(bearer(owner.token))
+      .send({ fullName: 'Hash Staff', email: staffEmail, roleName: 'SALES' });
+    expect(inv.status).toBe(201);
+
+    // Raw token only exists in the email link.
+    const mail = capture.sent.find((m) => m.to === staffEmail)!;
+    const rawToken = /\/invite\/([a-f0-9]{64})/.exec(mail.text + mail.html)![1];
+
+    const row = await prismaBase.invite.findUniqueOrThrow({ where: { id: inv.body.data.id } });
+    expect(row.tokenHash).toBe(sha256Hex(rawToken));
+    expect(row.tokenHash).not.toBe(rawToken);
+
+    // The emailed link resolves on the public lookup.
+    const lookup = await request(app).get(`/api/v1/auth/invite/${rawToken}`);
+    expect(lookup.status).toBe(200);
+    expect(lookup.body.data.email).toBe(staffEmail);
+  });
+
   it('requires the team:manage permission', async () => {
     const owner = await makeOwner('PermShop');
     // Demote: issue a token via a SALES user (no team:manage).
@@ -152,6 +176,92 @@ describe('staff invites', () => {
     const login = await request(app).post('/api/v1/auth/login').send({ email: salesEmail, password: PASSWORD });
     const res = await request(app).get('/api/v1/team').set(bearer(login.body.data.accessToken));
     expect(res.status).toBe(403);
+  });
+});
+
+describe('member deactivation (PATCH /team/members/:id)', () => {
+  it('deactivates a member, kills their sessions, and can reactivate', async () => {
+    const owner = await makeOwner('DeactShop');
+    const salesRole = await prismaBase.role.findFirstOrThrow({ where: { name: 'SALES' } });
+    const email = `deact-${Date.now()}@team.test`;
+    const member = await prismaBase.user.create({
+      data: { tenantId: owner.tenantId, email, fullName: 'Leaver', passwordHash: await hashPassword(PASSWORD), roleId: salesRole.id },
+    });
+    // Give them a live session.
+    const login = await request(app).post('/api/v1/auth/login').send({ email, password: PASSWORD });
+    expect(login.status).toBe(200);
+
+    const res = await request(app)
+      .patch(`/api/v1/team/members/${member.id}`)
+      .set(bearer(owner.token))
+      .send({ isActive: false });
+    expect(res.status).toBe(200);
+    expect(res.body.data.isActive).toBe(false);
+
+    // Refresh tokens revoked + password login refused.
+    const live = await prismaBase.refreshToken.count({ where: { userId: member.id, revokedAt: null } });
+    expect(live).toBe(0);
+    const reLogin = await request(app).post('/api/v1/auth/login').send({ email, password: PASSWORD });
+    expect(reLogin.status).toBe(401);
+
+    // Reactivate restores access.
+    const back = await request(app)
+      .patch(`/api/v1/team/members/${member.id}`)
+      .set(bearer(owner.token))
+      .send({ isActive: true });
+    expect(back.status).toBe(200);
+    const loginAgain = await request(app).post('/api/v1/auth/login').send({ email, password: PASSWORD });
+    expect(loginAgain.status).toBe(200);
+  });
+
+  it('refuses self-deactivation and removing the last active admin', async () => {
+    const owner = await makeOwner('LastAdminShop');
+    const me = await prismaBase.user.findFirstOrThrow({
+      where: { tenantId: owner.tenantId, role: { name: 'ADMIN' } },
+    });
+
+    const self = await request(app)
+      .patch(`/api/v1/team/members/${me.id}`)
+      .set(bearer(owner.token))
+      .send({ isActive: false });
+    expect(self.status).toBe(409);
+
+    // A second admin can't deactivate the only OTHER admin if that would leave
+    // zero active admins — covered by deactivating the sole admin from a peer.
+    const adminRole = await prismaBase.role.findFirstOrThrow({ where: { name: 'ADMIN' } });
+    const email = `second-admin-${Date.now()}@team.test`;
+    await prismaBase.user.create({
+      data: { tenantId: owner.tenantId, email, fullName: 'Second Admin', passwordHash: await hashPassword(PASSWORD), roleId: adminRole.id },
+    });
+    const second = await request(app).post('/api/v1/auth/login').send({ email, password: PASSWORD });
+
+    // Second admin deactivates the first — allowed (one active admin remains)…
+    const ok = await request(app)
+      .patch(`/api/v1/team/members/${me.id}`)
+      .set(bearer(second.body.data.accessToken))
+      .send({ isActive: false });
+    expect(ok.status).toBe(200);
+
+    // …but now they are the last active admin and cannot be deactivated,
+    // no matter whose (still-valid) token asks.
+    const secondUser = await prismaBase.user.findUniqueOrThrow({ where: { email } });
+    const blocked = await request(app)
+      .patch(`/api/v1/team/members/${secondUser.id}`)
+      .set(bearer(owner.token))
+      .send({ isActive: false });
+    expect(blocked.status).toBe(409);
+  });
+
+  it('is tenant-scoped: cannot deactivate another tenant\'s member', async () => {
+    const ownerA = await makeOwner('ScopeA');
+    const ownerB = await makeOwner('ScopeB');
+    const memberB = await prismaBase.user.findFirstOrThrow({ where: { tenantId: ownerB.tenantId } });
+
+    const res = await request(app)
+      .patch(`/api/v1/team/members/${memberB.id}`)
+      .set(bearer(ownerA.token))
+      .send({ isActive: false });
+    expect(res.status).toBe(404);
   });
 });
 

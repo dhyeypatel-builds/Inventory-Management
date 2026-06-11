@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma, type TxClient } from '../../db/prisma';
 import {
   ConflictError,
+  ForbiddenError,
   InsufficientStockError,
   NotFoundError,
   ValidationError,
@@ -40,6 +41,7 @@ export const createSale = async (
   data: CreateSaleInput,
   createdBy?: string,
   idempotencyKey?: string,
+  actorPermissions: string[] = [],
 ) => {
   // Short-circuit: an already-processed idempotency key returns the same sale.
   if (idempotencyKey) {
@@ -78,9 +80,16 @@ export const createSale = async (
   }
 
   // Build line items with price/description snapshots and per-line totals.
+  const canOverridePrice = actorPermissions.includes('sale:override_price');
   const lines = data.items.map((item) => {
     const variant = variantMap.get(item.variantId)!;
     const unitPrice = item.unitPrice ?? Number(variant.sellingPrice);
+
+    // Selling at a price other than the listed one is a fraud vector at the
+    // till — it needs its own permission (ADMIN-only by default).
+    if (unitPrice !== Number(variant.sellingPrice) && !canOverridePrice) {
+      throw new ForbiddenError('Changing the unit price requires price-override permission');
+    }
     const taxRatePct = Number(variant.taxRatePct);
     const lineBase = round2(unitPrice * item.quantity);
 

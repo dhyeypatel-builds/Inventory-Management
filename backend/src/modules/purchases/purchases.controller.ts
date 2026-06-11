@@ -35,6 +35,21 @@ export const createVendor = async (
   }
 };
 
+export const updateVendor = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const vendor = await purchasesService.updateVendor(req.params.id as string, req.body);
+    res.locals.auditAfter = vendor;
+    res.locals.auditEntityId = vendor.id;
+    success(res, vendor);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ─── Purchases ───────────────────────────────────────────────────────────────
 
 export const create = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

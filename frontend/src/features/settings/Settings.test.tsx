@@ -1,10 +1,22 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/app/providers';
 import { SettingsPage } from './pages/SettingsPage';
 import * as settingsApi from './api/settings.api';
+import * as teamApi from './api/team.api';
+import { seedAuthedSession } from '../../../test/fixtures';
 
 jest.mock('./api/settings.api');
+jest.mock('./api/team.api', () => ({
+  ...jest.requireActual('./api/team.api'),
+  listTeam: jest.fn(),
+  inviteStaff: jest.fn(),
+  revokeInvite: jest.fn(),
+  setMemberActive: jest.fn(),
+}));
+
+const mockListTeam = jest.mocked(teamApi.listTeam);
 
 const mockGetSettings = jest.mocked(settingsApi.getSettings);
 const mockUpdateSettings = jest.mocked(settingsApi.updateSettings);
@@ -35,12 +47,15 @@ function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <SettingsPage />
+      <AuthProvider>
+        <SettingsPage />
+      </AuthProvider>
     </QueryClientProvider>,
   );
 }
 
 beforeEach(() => {
+  seedAuthedSession();
   mockGetSettings.mockResolvedValue(mockSettings);
   mockUpdateSettings.mockResolvedValue(mockSettings);
   mockListBrands.mockResolvedValue(mockBrands);
@@ -63,6 +78,43 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('tab', { name: /tax & inventory/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /^brands$/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /^categories$/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /^team$/i })).toBeInTheDocument();
+  });
+
+  it('hides the Team tab from users without team:manage', () => {
+    seedAuthedSession({ permissions: ['settings:read', 'settings:write'] });
+    renderPage();
+    expect(screen.queryByRole('tab', { name: /^team$/i })).not.toBeInTheDocument();
+  });
+
+  it('shows team members and pending invites on the Team tab', async () => {
+    mockListTeam.mockResolvedValue({
+      members: [
+        {
+          id: 'u1', fullName: 'Test Admin', email: 'a@b.c', roleName: 'ADMIN',
+          isActive: true, lastLoginAt: '2026-06-01T00:00:00Z', pending: false,
+        },
+        {
+          id: 'u2', fullName: 'Casey Counter', email: 'casey@shop.co.uk', roleName: 'SALES',
+          isActive: true, lastLoginAt: null, pending: true,
+        },
+      ],
+      invites: [
+        {
+          id: 'i1', email: 'casey@shop.co.uk', roleName: 'SALES',
+          expiresAt: '2026-06-18T00:00:00Z', createdAt: '2026-06-11T00:00:00Z',
+        },
+      ],
+    });
+
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('tab', { name: /^team$/i }));
+
+    expect(await screen.findByText('Casey Counter')).toBeInTheDocument();
+    expect(screen.getByText(/pending invites/i)).toBeInTheDocument();
+    // The current user can't deactivate themselves; others get the action.
+    expect(screen.getByRole('button', { name: /deactivate/i })).toBeInTheDocument();
   });
 
   it('loads and displays company name in the form', async () => {

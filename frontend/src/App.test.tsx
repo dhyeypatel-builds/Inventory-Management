@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import { routes } from '@/app/router';
 import { Providers } from '@/app/providers';
+import { seedAuthedSession } from '../test/fixtures';
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
@@ -26,12 +27,7 @@ describe('App routing', () => {
   });
 
   it('redirects an authenticated visit to "/" into the dashboard shell', async () => {
-    localStorage.setItem('ts_access', 'fake-access');
-    localStorage.setItem('ts_refresh', 'fake-refresh');
-    localStorage.setItem(
-      'ts_user',
-      JSON.stringify({ id: 'u1', tenantId: 't1', tenantName: 'Shop', onboardingCompletedAt: '2026-01-01T00:00:00Z', fullName: 'Test Admin', email: 'a@b.c', role: 'ADMIN', permissions: [] }),
-    );
+    seedAuthedSession();
 
     const router = renderAt('/');
     // PublicRoot redirects authenticated users to /dashboard: shell + nav render.

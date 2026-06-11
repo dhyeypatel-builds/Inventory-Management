@@ -1,5 +1,6 @@
 import { prisma } from '../../db/prisma';
 import { AppError, NotFoundError } from '../../utils/errors';
+import { sha256Hex } from '../../utils/hash';
 
 export interface InviteDetails {
   email: string;
@@ -16,7 +17,7 @@ export interface InviteDetails {
  */
 export async function getInviteByToken(token: string): Promise<InviteDetails> {
   const invite = await prisma.invite.findUnique({
-    where: { token },
+    where: { tokenHash: sha256Hex(token) },
     include: { tenant: true, role: true },
   });
 

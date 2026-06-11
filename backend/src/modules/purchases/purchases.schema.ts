@@ -11,6 +11,11 @@ export const createVendorSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
+export const updateVendorSchema = createVendorSchema.partial().refine(
+  (d) => Object.keys(d).length > 0,
+  { message: 'Provide at least one field to update' },
+);
+
 export const listVendorsQuerySchema = z.object({
   q: z.string().optional(),
   page: z.coerce.number().int().min(1).optional(),
@@ -77,6 +82,7 @@ export const updateSerialSchema = z.object({
 });
 
 export type CreateVendorInput = z.infer<typeof createVendorSchema>;
+export type UpdateVendorInput = z.infer<typeof updateVendorSchema>;
 export type ListVendorsQuery = z.infer<typeof listVendorsQuerySchema>;
 export type CreatePurchaseInput = z.infer<typeof createPurchaseSchema>;
 export type ListPurchasesQuery = z.infer<typeof listPurchasesQuerySchema>;

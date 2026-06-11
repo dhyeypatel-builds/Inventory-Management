@@ -27,6 +27,17 @@ export async function logout(): Promise<void> {
   await api.post('/auth/logout', {}).catch(() => {});
 }
 
+/**
+ * Changes (or, for passwordless invited users, sets) the account password.
+ * The server revokes all refresh tokens, so other devices sign out shortly.
+ */
+export async function changePassword(input: {
+  currentPassword?: string;
+  newPassword: string;
+}): Promise<void> {
+  await api.post('/auth/change-password', input);
+}
+
 export interface InviteDetails {
   email: string;
   tenantName: string;

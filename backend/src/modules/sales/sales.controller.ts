@@ -10,7 +10,12 @@ export const create = async (req: Request, res: Response, next: NextFunction): P
     const idempotencyKey =
       (req.headers['idempotency-key'] as string | undefined)?.trim() || undefined;
 
-    const sale = await salesService.createSale(req.body, req.user?.id, idempotencyKey);
+    const sale = await salesService.createSale(
+      req.body,
+      req.user?.id,
+      idempotencyKey,
+      req.user?.permissions ?? [],
+    );
     res.locals.auditAfter = { id: sale.id, invoiceNo: sale.invoiceNo, grandTotal: sale.grandTotal };
     res.locals.auditEntityId = sale.id;
     created(res, sale);

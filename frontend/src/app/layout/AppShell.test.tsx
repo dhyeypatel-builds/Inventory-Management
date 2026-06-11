@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter } from 'react-router';
 import { Providers } from '@/app/providers';
 import { AppShell } from './AppShell';
 import { BREAKPOINTS } from '@/shared/hooks/useMediaQuery';
+import { seedAuthedSession } from '../../../test/fixtures';
 
 type Variant = 'mobile' | 'tablet' | 'desktop';
 
@@ -23,6 +24,8 @@ function mockBreakpoint(active: Variant): void {
 }
 
 function renderShell(): void {
+  // Nav items are permission-filtered, so the shell needs a signed-in user.
+  seedAuthedSession();
   const router = createMemoryRouter(
     [
       {
@@ -71,15 +74,18 @@ describe('AppShell responsive navigation', () => {
     expect(screen.getByRole('link', { name: /products/i })).toBeInTheDocument();
   });
 
-  it('mobile: renders the bottom navigation bar instead of the sidebar', () => {
+  it('mobile: renders the bottom navigation bar instead of the sidebar', async () => {
     mockBreakpoint('mobile');
     renderShell();
 
-    // Bottom nav exposes the same destinations as links...
+    // The first destinations are bar tabs; the rest live behind "More".
     expect(screen.getByRole('link', { name: /products/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /stock alerts/i })).toBeInTheDocument();
-    // ...but without the sidebar wordmark or the tablet hamburger.
+    expect(screen.queryByRole('link', { name: /stock alerts/i })).not.toBeInTheDocument();
+    // No sidebar wordmark or tablet hamburger on mobile.
     expect(screen.queryByText('TyreStock')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /open navigation/i })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /more/i }));
+    expect(screen.getByRole('link', { name: /stock alerts/i })).toBeInTheDocument();
   });
 });

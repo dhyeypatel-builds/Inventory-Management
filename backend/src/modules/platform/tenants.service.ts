@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { env } from '../../config/env';
 import { ConflictError, NotFoundError } from '../../utils/errors';
+import { sha256Hex } from '../../utils/hash';
 import { sendInviteEmail } from '../../email';
 import { signImpersonationToken } from './platform-auth.service';
 
@@ -165,7 +166,7 @@ export async function provisionTenant(input: ProvisionInput, ctx: AuditCtx): Pro
           tenantId: tenant.id,
           email: input.ownerEmail,
           roleId: adminRole.id,
-          token,
+          tokenHash: sha256Hex(token),
           expiresAt,
           invitedBy: ctx.actorId ?? null,
         },

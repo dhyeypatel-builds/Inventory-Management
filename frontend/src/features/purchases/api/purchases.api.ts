@@ -14,6 +14,24 @@ export async function searchVendors(q: string): Promise<Vendor[]> {
   return res.data.data as Vendor[];
 }
 
+export interface VendorListResponse {
+  items: Vendor[];
+  meta: { page: number; pageSize: number; total: number; totalPages: number };
+}
+
+export async function listVendors(params: { q?: string; page?: number; pageSize?: number } = {}): Promise<VendorListResponse> {
+  const res = await api.get('/vendors', { params });
+  return { items: res.data.data, meta: res.data.meta } as VendorListResponse;
+}
+
+export async function updateVendor(
+  id: string,
+  data: Partial<Pick<Vendor, 'name' | 'phone' | 'email' | 'vatNumber' | 'address' | 'notes'>>,
+): Promise<Vendor> {
+  const res = await api.patch(`/vendors/${id}`, data);
+  return res.data.data as Vendor;
+}
+
 // ─── Purchases ───────────────────────────────────────────────────────────────
 
 export interface ListPurchasesParams {
