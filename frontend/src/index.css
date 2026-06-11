@@ -99,3 +99,35 @@
     transform: none !important;
   }
 }
+
+/* ── Print: only the invoice (.print-area) reaches paper ─────────────────── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+  }
+  /* When the invoice is shown inside a dialog, un-fix the dialog so long
+     invoices paginate instead of clipping to the viewport. */
+  .print-dialog {
+    position: static !important;
+    transform: none !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+}

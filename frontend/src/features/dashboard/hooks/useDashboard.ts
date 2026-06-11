@@ -1,6 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import { getSummary, getSalesTrend, getTopBrands, getFastMoving } from '../api/dashboard.api';
+import {
+  getSummary,
+  getSalesTrend,
+  getTopBrands,
+  getFastMoving,
+  getRevenueSeries,
+} from '../api/dashboard.api';
 import { getLowStockItems } from '../api/inventory.api';
+import type { RevenueInterval } from '../types';
+
+export function useRevenueSeries(interval: RevenueInterval, periods = 12) {
+  return useQuery({
+    queryKey: ['dashboard', 'revenue-series', interval, periods],
+    queryFn: () => getRevenueSeries(interval, periods),
+    staleTime: 60_000,
+  });
+}
 
 export function useSummary() {
   return useQuery({

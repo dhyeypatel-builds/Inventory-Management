@@ -148,13 +148,34 @@ describe('POST /api/v1/auth/refresh', () => {
     expect(res.body.data.refreshToken).not.toBe(refreshToken);
   });
 
-  it('returns 401 when the same refresh token is reused after rotation', async () => {
+  it('tolerates immediate reuse after rotation (parallel-tab grace window)', async () => {
     // First rotation — consumes the original token
     await request(app)
       .post('/api/v1/auth/refresh')
       .send({ refreshToken });
 
-    // Second attempt with the same (now-revoked) token
+    // Second attempt right away: a benign race, not theft → fresh pair
+    const res = await request(app)
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.data.accessToken).toBe('string');
+  });
+
+  it('returns 401 when a refresh token is reused well after rotation', async () => {
+    // First rotation — consumes the original token
+    await request(app)
+      .post('/api/v1/auth/refresh')
+      .send({ refreshToken });
+
+    // Push the revocation outside the grace window
+    await prisma.refreshToken.updateMany({
+      where: { userId: testUserId, revokedAt: { not: null } },
+      data: { revokedAt: new Date(Date.now() - 60_000) },
+    });
+
+    // Stale reuse → theft signal
     const res = await request(app)
       .post('/api/v1/auth/refresh')
       .send({ refreshToken });

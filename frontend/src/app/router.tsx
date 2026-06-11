@@ -15,6 +15,8 @@ import { ProductFormPage } from '@/features/products/pages/ProductFormPage';
 import { InventoryListPage } from '@/features/inventory/pages/InventoryListPage';
 import { PosPage } from '@/features/sales/pages/PosPage';
 import { SalesHistoryPage } from '@/features/sales/pages/SalesHistoryPage';
+import { PurchaseHistoryPage } from '@/features/purchases/pages/PurchaseHistoryPage';
+import { PurchaseEntryPage } from '@/features/purchases/pages/PurchaseEntryPage';
 import { CustomerListPage } from '@/features/customers/pages/CustomerListPage';
 import { CustomerDetailPage } from '@/features/customers/pages/CustomerDetailPage';
 import { ReportsPage } from '@/features/reports/pages/ReportsPage';
@@ -67,6 +69,8 @@ export const routes: RouteObject[] = [
       { path: 'inventory', element: <InventoryListPage /> },
       { path: 'sales', element: <SalesHistoryPage /> },
       { path: 'sales/pos', element: <PosPage /> },
+      { path: 'purchases', element: <PurchaseHistoryPage /> },
+      { path: 'purchases/new', element: <PurchaseEntryPage /> },
       { path: 'customers', element: <CustomerListPage /> },
       { path: 'customers/:id', element: <CustomerDetailPage /> },
       { path: 'reports', element: <ReportsPage /> },

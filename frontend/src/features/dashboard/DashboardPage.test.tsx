@@ -10,6 +10,7 @@ jest.mock('./api/inventory.api');
 
 const mockSummary = jest.mocked(dashboardApi.getSummary);
 const mockTrend = jest.mocked(dashboardApi.getSalesTrend);
+const mockRevenueSeries = jest.mocked(dashboardApi.getRevenueSeries);
 const mockBrands = jest.mocked(dashboardApi.getTopBrands);
 const mockFastMoving = jest.mocked(dashboardApi.getFastMoving);
 const mockLowStock = jest.mocked(inventoryApi.getLowStockItems);
@@ -35,6 +36,7 @@ const summaryData = {
 beforeEach(() => {
   mockSummary.mockResolvedValue(summaryData);
   mockTrend.mockResolvedValue([{ date: '2026-06-01', salesCount: 3, revenue: 5000 }]);
+  mockRevenueSeries.mockResolvedValue([{ period: '2026-06-01', salesCount: 3, revenue: 5000 }]);
   mockBrands.mockResolvedValue([{ brandId: 1, brandName: 'MRF', units: 20, revenue: 40000 }]);
   mockFastMoving.mockResolvedValue([]);
   mockLowStock.mockResolvedValue([]);

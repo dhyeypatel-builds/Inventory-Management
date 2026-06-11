@@ -38,9 +38,8 @@ export function ProductTable({ products, loading, onDelete }: ProductTableProps)
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
-            <TableHead className="whitespace-nowrap">Type</TableHead>
+            <TableHead className="whitespace-nowrap">SKU / Size</TableHead>
             <TableHead>Brand</TableHead>
-            <TableHead className="text-right">Variants</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
             <TableHead className="w-20" />
@@ -49,15 +48,30 @@ export function ProductTable({ products, loading, onDelete }: ProductTableProps)
         <TableBody>
           {products.map((p) => (
             <TableRow key={p.id}>
-              <TableCell className="font-medium">{p.name}</TableCell>
-              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                {p.productType.name}
+              <TableCell className="font-medium">
+                <div>{p.name}</div>
+                <div className="text-xs text-muted-foreground">{p.productType.name}</div>
+              </TableCell>
+              <TableCell className="whitespace-nowrap">
+                {p.variants.length === 0 ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <div className="space-y-0.5">
+                    {p.variants.slice(0, 2).map((v) => (
+                      <div key={v.sku} className="font-mono text-sm font-semibold">
+                        {v.sku}
+                      </div>
+                    ))}
+                    {p.variants.length > 2 && (
+                      <div className="font-mono text-xs text-muted-foreground">
+                        +{p.variants.length - 2} more
+                      </div>
+                    )}
+                  </div>
+                )}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {p.brand?.name ?? <span>—</span>}
-              </TableCell>
-              <TableCell className="text-right font-mono tabular text-base font-semibold">
-                {p._count.variants}
               </TableCell>
               <TableCell>
                 <Badge variant={p.isActive ? 'success' : 'secondary'}>

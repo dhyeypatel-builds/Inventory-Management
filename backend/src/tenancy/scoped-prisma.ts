@@ -37,6 +37,10 @@ const SCOPED_MODELS = new Set<string>([
   'AuditLog',
   'Setting',
   'Invite',
+  'Vendor',
+  'Purchase',
+  'PurchaseItem',
+  'SerialNumber',
 ]);
 
 /** The tenant to scope to, or null to pass through unscoped. */

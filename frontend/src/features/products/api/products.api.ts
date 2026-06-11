@@ -66,3 +66,13 @@ export async function listCategories(): Promise<Category[]> {
   const res = await api.get('/categories');
   return res.data.data as Category[];
 }
+
+export async function createBrand(name: string): Promise<Brand> {
+  const res = await api.post('/brands', { name });
+  return res.data.data as Brand;
+}
+
+export async function createCategory(name: string): Promise<Category> {
+  const res = await api.post('/categories', { name });
+  return res.data.data as Category;
+}

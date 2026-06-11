@@ -6,6 +6,7 @@ import {
   listSales,
   cancelSale,
   searchCustomers,
+  getSaleInvoice,
   type SearchVariantsParams,
   type ListSalesParams,
 } from '../api/sales.api';
@@ -15,6 +16,7 @@ export const salesKeys = {
   all: ['sales'] as const,
   list: (params: ListSalesParams) => ['sales', 'list', params] as const,
   detail: (id: string) => ['sales', 'detail', id] as const,
+  invoice: (id: string) => ['sales', 'invoice', id] as const,
   variants: (params: SearchVariantsParams) => ['variants', 'search', params] as const,
   customers: (q: string) => ['customers', 'search', q] as const,
 };
@@ -32,6 +34,16 @@ export function useSale(id: string) {
     queryKey: salesKeys.detail(id),
     queryFn: () => getSale(id),
     staleTime: 30_000,
+    enabled: !!id,
+  });
+}
+
+/** Invoice payload — same sale plus the company header block from settings. */
+export function useSaleInvoice(id: string) {
+  return useQuery({
+    queryKey: salesKeys.invoice(id),
+    queryFn: () => getSaleInvoice(id),
+    staleTime: 60_000,
     enabled: !!id,
   });
 }

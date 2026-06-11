@@ -35,6 +35,21 @@ export const salesTrend = async (
   }
 };
 
+export const revenueSeries = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const interval = req.query.interval === 'month' ? 'month' : 'week';
+    const periods = toInt(req.query.periods, 12, 1, interval === 'week' ? 53 : 24);
+    const series = await dashboardService.getRevenueSeries(interval, periods);
+    success(res, { interval, periods, series });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const topBrands = async (
   req: Request,
   res: Response,

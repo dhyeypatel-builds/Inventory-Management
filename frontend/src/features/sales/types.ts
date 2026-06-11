@@ -7,6 +7,7 @@ export interface VariantSearchResult {
   productId: string;
   productName: string;
   brandName: string | null;
+  purchasePrice: number;
   sellingPrice: number;
   taxRatePct: number;
   onHand: number;
@@ -32,6 +33,8 @@ export interface CartItem {
   unitPrice: number;
   discount: number;
   taxRatePct: number;
+  /** Optional comma-separated serial numbers being sold (warranty tracing). */
+  serialsText?: string;
 }
 
 export interface SaleItemDetail {
@@ -44,6 +47,15 @@ export interface SaleItemDetail {
   discount: number;
   taxRatePct: number;
   lineTotal: number;
+}
+
+export interface InvoiceCompany {
+  name?: string;
+  address?: string;
+  phone?: string;
+  gstin?: string;
+  vat_no?: string;
+  logo_url?: string;
 }
 
 export interface SaleDetail {
@@ -60,6 +72,8 @@ export interface SaleDetail {
   soldAt: string;
   createdBy: string | null;
   items: SaleItemDetail[];
+  /** Present only on the /sales/:id/invoice payload. */
+  company?: InvoiceCompany;
 }
 
 export interface SaleListItem {
@@ -92,6 +106,7 @@ export interface CreateSalePayload {
     quantity: number;
     unitPrice?: number;
     discount: number;
+    serials?: string[];
   }[];
 }
 

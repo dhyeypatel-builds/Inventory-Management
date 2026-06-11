@@ -181,6 +181,41 @@ describe('GET /api/v1/dashboard/sales-trend', () => {
   });
 });
 
+// ─── GET /dashboard/revenue-series ──────────────────────────────────────────
+
+describe('GET /api/v1/dashboard/revenue-series', () => {
+  it('returns a zero-filled weekly series whose last bucket holds this suite\'s sale', async () => {
+    const res = await request(app)
+      .get('/api/v1/dashboard/revenue-series?interval=week&periods=12')
+      .set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body.data.interval).toBe('week');
+
+    const series = res.body.data.series as {
+      period: string;
+      salesCount: number;
+      revenue: number;
+    }[];
+    expect(series).toHaveLength(12);
+
+    const current = series[series.length - 1];
+    expect(current.salesCount).toBeGreaterThanOrEqual(1);
+    expect(current.revenue).toBeGreaterThanOrEqual(SALE_GRAND_TOTAL);
+  });
+
+  it('supports a monthly interval', async () => {
+    const res = await request(app)
+      .get('/api/v1/dashboard/revenue-series?interval=month&periods=6')
+      .set(auth());
+    expect(res.status).toBe(200);
+    expect(res.body.data.interval).toBe('month');
+    expect(res.body.data.series).toHaveLength(6);
+
+    const current = res.body.data.series[res.body.data.series.length - 1];
+    expect(current.revenue).toBeGreaterThanOrEqual(SALE_GRAND_TOTAL);
+  });
+});
+
 // ─── GET /dashboard/top-brands ──────────────────────────────────────────────
 
 describe('GET /api/v1/dashboard/top-brands', () => {

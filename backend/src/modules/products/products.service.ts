@@ -279,7 +279,23 @@ export const listProducts = async (query: ListProductsQuery) => {
     ...(query.includeInactive ? {} : { isActive: true }),
     ...(query.brand ? { brandId: query.brand } : {}),
     ...(query.type ? { productTypeId: query.type } : {}),
-    ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
+    // Search matches the product name OR any variant SKU — tyre vendors search
+    // by rim size (R15, R14) which is encoded in the SKU.
+    ...(query.q
+      ? {
+          OR: [
+            { name: { contains: query.q, mode: 'insensitive' as const } },
+            {
+              variants: {
+                some: {
+                  deletedAt: null,
+                  sku: { contains: query.q, mode: 'insensitive' as const },
+                },
+              },
+            },
+          ],
+        }
+      : {}),
   };
 
   const [products, total] = await Promise.all([
@@ -292,6 +308,11 @@ export const listProducts = async (query: ListProductsQuery) => {
         brand: { select: { id: true, name: true } },
         category: { select: { id: true, name: true } },
         productType: { select: { id: true, name: true } },
+        variants: {
+          where: { deletedAt: null, isActive: true },
+          select: { sku: true },
+          orderBy: { sku: 'asc' },
+        },
         _count: { select: { variants: { where: { deletedAt: null, isActive: true } } } },
       },
     }),
@@ -406,16 +427,20 @@ export const updateVariant = async (
 export const searchVariants = async (query: VariantSearchQuery) => {
   const { page, pageSize, skip, take } = parsePagination(query);
 
-  const productFilter: Prisma.ProductWhereInput = {
-    deletedAt: null,
-    isActive: true,
-    ...(query.q ? { name: { contains: query.q, mode: 'insensitive' as const } } : {}),
-  };
-
   const where: Prisma.ProductVariantWhereInput = {
     deletedAt: null,
     isActive: true,
-    product: productFilter,
+    product: { deletedAt: null, isActive: true },
+    // q matches the product name OR the SKU — tyre staff search by rim size
+    // (R15, R14), which lives in the SKU.
+    ...(query.q
+      ? {
+          OR: [
+            { sku: { contains: query.q, mode: 'insensitive' as const } },
+            { product: { name: { contains: query.q, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}),
     ...(query.size
       ? {
           attributeValues: {

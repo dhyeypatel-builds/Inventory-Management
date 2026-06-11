@@ -20,19 +20,22 @@ interface SalesTrendChartProps {
 
 export function SalesTrendChart({ data, loading, error }: SalesTrendChartProps) {
   return (
-    <Card className="col-span-2 flex flex-col">
+    <Card className="flex flex-1 flex-col">
       <CardHeader>
-        <CardTitle className="text-base">Sales Trend (30 days)</CardTitle>
+        <CardTitle className="text-base">Daily Sales Trend (30 days)</CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 min-h-0 pb-4">
-        {loading && <Skeleton className="h-48 w-full" />}
+      <CardContent className="flex flex-1 flex-col pb-4">
+        {loading && <Skeleton className="min-h-[14rem] w-full flex-1" />}
         {error && (
           <p className="text-sm text-muted-foreground">Could not load chart data.</p>
         )}
         {!loading && !error && data && data.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">No sales in this period</p>
+          <p className="flex flex-1 items-center justify-center py-12 text-center text-sm text-muted-foreground">
+            No sales in this period
+          </p>
         )}
         {!loading && !error && data && data.length > 0 && (
+          <div className="min-h-[14rem] flex-1">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
@@ -84,6 +87,7 @@ export function SalesTrendChart({ data, loading, error }: SalesTrendChartProps) 
               />
             </AreaChart>
           </ResponsiveContainer>
+          </div>
         )}
       </CardContent>
     </Card>

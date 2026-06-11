@@ -128,13 +128,16 @@ describe('rotateRefreshToken', () => {
     expect(typeof result.token).toBe('string');
     expect(result.token).not.toBe(token);
 
-    // Old token must be revoked
+    // Old token must be revoked and marked as rotated
     expect(mockRefreshToken.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: tokenId }, data: { revokedAt: expect.any(Date) } }),
+      expect.objectContaining({
+        where: { id: tokenId },
+        data: { revokedAt: expect.any(Date), replacedById: expect.any(String) },
+      }),
     );
   });
 
-  it('detects reuse of a revoked token and revokes all family tokens', async () => {
+  it('tolerates reuse of a token revoked moments ago (parallel-tab race)', async () => {
     const { token, tokenId } = await issueToken();
 
     mockRefreshToken.findUnique.mockResolvedValue({
@@ -142,7 +145,28 @@ describe('rotateRefreshToken', () => {
       userId: 'user-uuid-1',
       tokenHash: 'stored-hash',
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      revokedAt: new Date(), // already revoked → reuse
+      revokedAt: new Date(Date.now() - 1_000), // revoked 1s ago → benign race
+      replacedById: 'replacement-token-id', // revoked BY ROTATION
+    });
+
+    const result = await rotateRefreshToken(token);
+
+    expect(result.userId).toBe('user-uuid-1');
+    expect(typeof result.token).toBe('string');
+    // No family revocation for a benign race
+    expect(mockRefreshToken.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('detects stale reuse of a revoked token and revokes all family tokens', async () => {
+    const { token, tokenId } = await issueToken();
+
+    mockRefreshToken.findUnique.mockResolvedValue({
+      id: tokenId,
+      userId: 'user-uuid-1',
+      tokenHash: 'stored-hash',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      revokedAt: new Date(Date.now() - 60_000), // revoked a minute ago → theft signal
+      replacedById: 'replacement-token-id',
     });
     mockRefreshToken.updateMany.mockResolvedValue({ count: 2 });
 

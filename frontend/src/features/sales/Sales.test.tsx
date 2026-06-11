@@ -20,6 +20,7 @@ const mockVariant = {
   productId: 'prod-1',
   productName: 'MRF ZTX 195/65R15',
   brandName: 'MRF',
+  purchasePrice: 1000,
   sellingPrice: 1500,
   taxRatePct: 18,
   onHand: 10,

@@ -9,7 +9,7 @@ import { ItemSearch } from '../components/ItemSearch';
 import { Cart, computeTotals } from '../components/Cart';
 import { CustomerPicker } from '../components/CustomerPicker';
 import { InvoiceView } from '../components/InvoiceView';
-import { useCreateSale } from '../hooks/useSales';
+import { useCreateSale, useSaleInvoice } from '../hooks/useSales';
 import { formatCurrency } from '@/shared/lib/currency';
 import { toast } from '@/shared/ui/use-toast';
 import type { CartItem, VariantSearchResult, Customer, SaleDetail, PaymentMode } from '../types';
@@ -35,6 +35,8 @@ export function PosPage() {
   const idempotencyKeyRef = useRef(generateIdempotencyKey());
 
   const createSale = useCreateSale();
+  // Company header for the printable invoice (only fetched once a sale completes)
+  const { data: invoicePayload } = useSaleInvoice(completedSale?.id ?? '');
 
   function addToCart(variant: VariantSearchResult) {
     setCartItems((prev) => {
@@ -72,6 +74,12 @@ export function PosPage() {
     );
   }, []);
 
+  const changeSerials = useCallback((variantId: string, serialsText: string) => {
+    setCartItems((prev) =>
+      prev.map((i) => (i.variantId === variantId ? { ...i, serialsText } : i)),
+    );
+  }, []);
+
   const removeItem = useCallback((variantId: string) => {
     setCartItems((prev) => prev.filter((i) => i.variantId !== variantId));
   }, []);
@@ -85,12 +93,19 @@ export function PosPage() {
         payload: {
           customerId: customer?.id,
           paymentMode,
-          items: cartItems.map((i) => ({
-            variantId: i.variantId,
-            quantity: i.quantity,
-            unitPrice: i.unitPrice,
-            discount: i.discount,
-          })),
+          items: cartItems.map((i) => {
+            const serials = (i.serialsText ?? '')
+              .split(/[,\n]/)
+              .map((s) => s.trim())
+              .filter(Boolean);
+            return {
+              variantId: i.variantId,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              discount: i.discount,
+              ...(serials.length > 0 ? { serials } : {}),
+            };
+          }),
         },
         idempotencyKey: idempotencyKeyRef.current,
       });
@@ -145,7 +160,7 @@ export function PosPage() {
           </div>
           <Button onClick={() => setCompletedSale(null)}>New Sale</Button>
         </div>
-        <InvoiceView sale={completedSale} />
+        <InvoiceView sale={completedSale} company={invoicePayload?.company} />
       </div>
     );
   }
@@ -167,13 +182,15 @@ export function PosPage() {
             items={cartItems}
             onChangeQty={changeQty}
             onChangeDiscount={changeDiscount}
+            onChangeSerials={changeSerials}
             onRemove={removeItem}
           />
         </div>
 
         {/* Right: checkout panel */}
         <div className="lg:col-span-1">
-          <div className="space-y-4 rounded-sm border border-border bg-card p-4 shadow-panel lg:sticky lg:top-4">
+          {/* Light amber tint — the sales counterpart to the green purchase panel */}
+          <div className="space-y-4 rounded-sm border border-primary/35 bg-primary/[0.06] p-4 shadow-panel lg:sticky lg:top-4">
             <span className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               Checkout
             </span>

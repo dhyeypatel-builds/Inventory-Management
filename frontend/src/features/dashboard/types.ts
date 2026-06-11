@@ -12,6 +12,15 @@ export interface SalesTrendPoint {
   revenue: number;
 }
 
+export type RevenueInterval = 'week' | 'month';
+
+export interface RevenuePoint {
+  /** Bucket start date (YYYY-MM-DD). */
+  period: string;
+  salesCount: number;
+  revenue: number;
+}
+
 export interface TopBrand {
   brandId: number | null;
   brandName: string;

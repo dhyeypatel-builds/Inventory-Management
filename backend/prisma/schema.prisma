@@ -29,6 +29,19 @@ enum MovementType {
   DAMAGE
 }
 
+enum PurchaseStatus {
+  RECEIVED
+  CANCELLED
+}
+
+// Per-unit lifecycle for warranty / DOA tracing
+enum SerialStatus {
+  IN_STOCK
+  SOLD
+  RETURNED
+  DOA
+}
+
 enum SaleStatus {
   DRAFT
   CONFIRMED
@@ -88,6 +101,10 @@ model Tenant {
   settings               Setting[]
   counters               TenantCounter[]
   invites                Invite[]
+  vendors                Vendor[]
+  purchases              Purchase[]
+  purchaseItems          PurchaseItem[]
+  serialNumbers          SerialNumber[]
 
   @@map("tenants")
 }
@@ -165,6 +182,7 @@ model User {
   refreshTokens RefreshToken[]
   identities    AuthIdentity[]
   sales         Sale[]
+  purchases     Purchase[]
   createdAt     DateTime       @default(now())    @map("created_at")
   updatedAt     DateTime       @updatedAt         @map("updated_at")
 
@@ -176,13 +194,16 @@ model User {
 // pre-authentication (no tenant context yet) and looks tokens up by id. Scoped
 // transitively through the owning user.
 model RefreshToken {
-  id        String    @id @default(uuid())
-  userId    String    @map("user_id")
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @map("token_hash")
-  expiresAt DateTime  @map("expires_at")
-  revokedAt DateTime? @map("revoked_at")
-  createdAt DateTime  @default(now()) @map("created_at")
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String    @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  // Set when the token was consumed by rotation (vs logout/suspend revocation).
+  // Only rotation-revoked tokens qualify for the reuse grace window.
+  replacedById String?   @map("replaced_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   @@map("refresh_tokens")
 }
@@ -307,6 +328,8 @@ model ProductVariant {
   inventory         Inventory?
   movements         StockMovement[]
   saleItems         SaleItem[]
+  purchaseItems     PurchaseItem[]
+  serialNumbers     SerialNumber[]
   alerts            Alert[]
   createdAt         DateTime                @default(now()) @map("created_at")
   deletedAt         DateTime?               @map("deleted_at")
@@ -441,9 +464,95 @@ model SaleItem {
   discount    Decimal        @default(0)              @db.Decimal(12, 2)
   taxRatePct  Decimal        @default(0) @map("tax_rate_pct") @db.Decimal(5, 2)
   lineTotal   Decimal        @map("line_total")       @db.Decimal(12, 2)
+  serials     SerialNumber[]
 
   @@index([tenantId])
   @@map("sale_items")
+}
+
+// ─── Purchasing ───────────────────────────────────────────────────────────────
+
+model Vendor {
+  id        String     @id @default(uuid())
+  tenantId  String     @default("00000000-0000-0000-0000-000000000001") @map("tenant_id")
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String?
+  email     String?    @db.Citext
+  vatNumber String?    @map("vat_number")
+  address   String?
+  notes     String?
+  purchases Purchase[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  deletedAt DateTime?  @map("deleted_at")
+
+  @@index([tenantId])
+  @@map("vendors")
+}
+
+model Purchase {
+  id            String         @id @default(uuid())
+  tenantId      String         @default("00000000-0000-0000-0000-000000000001") @map("tenant_id")
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vendorId      String?        @map("vendor_id")
+  vendor        Vendor?        @relation(fields: [vendorId], references: [id])
+  invoiceNo     String         @map("invoice_no")   // the VENDOR's invoice number
+  invoiceDate   DateTime       @map("invoice_date") @db.Date
+  status        PurchaseStatus @default(RECEIVED)
+  subtotal      Decimal        @default(0)                     @db.Decimal(12, 2)
+  taxTotal      Decimal        @default(0) @map("tax_total")   @db.Decimal(12, 2)
+  grandTotal    Decimal        @default(0) @map("grand_total") @db.Decimal(12, 2)
+  notes         String?
+  receivedAt    DateTime       @default(now()) @map("received_at")
+  createdBy     String?        @map("created_by")
+  createdByUser User?          @relation(fields: [createdBy], references: [id])
+  items         PurchaseItem[]
+
+  @@index([tenantId])
+  @@index([vendorId])
+  @@index([receivedAt])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id          String         @id @default(uuid())
+  tenantId    String         @default("00000000-0000-0000-0000-000000000001") @map("tenant_id")
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseId  String         @map("purchase_id")
+  purchase    Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variantId   String         @map("variant_id")
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  description String                                   // snapshot at receipt time
+  quantity    Int
+  unitCost    Decimal        @map("unit_cost")  @db.Decimal(12, 2)
+  taxRatePct  Decimal        @default(0) @map("tax_rate_pct") @db.Decimal(5, 2)
+  lineTotal   Decimal        @map("line_total") @db.Decimal(12, 2)
+  serials     SerialNumber[]
+
+  @@index([tenantId])
+  @@map("purchase_items")
+}
+
+// One row per physical unit. Warranty/DOA claims trace the unit from the
+// vendor invoice (purchaseItem) to the customer invoice (saleItem).
+model SerialNumber {
+  id             String         @id @default(uuid())
+  tenantId       String         @default("00000000-0000-0000-0000-000000000001") @map("tenant_id")
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  variantId      String         @map("variant_id")
+  variant        ProductVariant @relation(fields: [variantId], references: [id])
+  serialNo       String         @map("serial_no")
+  status         SerialStatus   @default(IN_STOCK)
+  purchaseItemId String?        @map("purchase_item_id")
+  purchaseItem   PurchaseItem?  @relation(fields: [purchaseItemId], references: [id], onDelete: SetNull)
+  saleItemId     String?        @map("sale_item_id")
+  saleItem       SaleItem?      @relation(fields: [saleItemId], references: [id], onDelete: SetNull)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  @@unique([tenantId, serialNo])
+  @@index([variantId])
+  @@map("serial_numbers")
 }
 
 // ─── Alerts ───────────────────────────────────────────────────────────────────

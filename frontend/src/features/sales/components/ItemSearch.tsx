@@ -8,14 +8,19 @@ import { cn } from '@/shared/lib/cn';
 
 interface ItemSearchProps {
   onAdd: (variant: VariantSearchResult) => void;
+  /** Purchases receive stock for items that are currently out of stock. */
+  includeOutOfStock?: boolean;
 }
 
-export function ItemSearch({ onAdd }: ItemSearchProps) {
+export function ItemSearch({ onAdd, includeOutOfStock }: ItemSearchProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading } = useVariantSearch({ q: query }, query.length >= 2);
+  const { data, isLoading } = useVariantSearch(
+    { q: query, ...(includeOutOfStock ? { inStock: false } : {}) },
+    query.length >= 2,
+  );
   const results = data?.variants ?? [];
 
   // Close dropdown on outside click
@@ -76,7 +81,7 @@ export function ItemSearch({ onAdd }: ItemSearchProps) {
                 v.onHand === 0 && 'opacity-55',
               )}
               onClick={() => handleSelect(v)}
-              disabled={v.onHand === 0}
+              disabled={!includeOutOfStock && v.onHand === 0}
             >
               <div className="min-w-0">
                 <div className="truncate font-semibold">{v.productName}</div>

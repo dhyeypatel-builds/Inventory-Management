@@ -82,6 +82,66 @@ export const getSalesTrend = async (days: number) => {
   }));
 };
 
+// ─── Revenue series (weekly/monthly bars for business insight) ───────────────
+
+export type RevenueInterval = 'week' | 'month';
+
+/**
+ * Start of the bucket `periods - 1` intervals before the current one.
+ * Computed in UTC so the keys line up with Postgres date_trunc on UTC timestamps.
+ */
+function seriesStart(interval: RevenueInterval, periods: number): Date {
+  const now = new Date();
+  if (interval === 'week') {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const sinceMonday = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - sinceMonday - (periods - 1) * 7);
+    return d;
+  }
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (periods - 1), 1));
+}
+
+/** Advance a bucket-start date by one interval (UTC). */
+function nextPeriod(interval: RevenueInterval, d: Date): Date {
+  const n = new Date(d);
+  if (interval === 'week') n.setUTCDate(n.getUTCDate() + 7);
+  else n.setUTCMonth(n.getUTCMonth() + 1);
+  return n;
+}
+
+export const getRevenueSeries = async (interval: RevenueInterval, periods: number) => {
+  const tenantId = currentTenant();
+  const since = seriesStart(interval, periods);
+
+  const rows = await prisma.$queryRaw<
+    { period: Date; sales_count: bigint; revenue: string }[]
+  >`
+    SELECT date_trunc(${interval}, sold_at) AS period,
+           COUNT(*)::bigint                    AS sales_count,
+           COALESCE(SUM(grand_total), 0)::text AS revenue
+    FROM sales
+    WHERE tenant_id = ${tenantId} AND status = 'CONFIRMED' AND sold_at >= ${since}
+    GROUP BY 1
+    ORDER BY 1
+  `;
+
+  const byKey = new Map(
+    rows.map((r) => [
+      r.period.toISOString().slice(0, 10),
+      { salesCount: Number(r.sales_count), revenue: parseFloat(r.revenue) },
+    ]),
+  );
+
+  // Zero-fill empty buckets so quiet weeks/months still show on the chart
+  const series: { period: string; salesCount: number; revenue: number }[] = [];
+  for (let d = since, i = 0; i < periods; d = nextPeriod(interval, d), i += 1) {
+    const key = d.toISOString().slice(0, 10);
+    const hit = byKey.get(key);
+    series.push({ period: key, salesCount: hit?.salesCount ?? 0, revenue: hit?.revenue ?? 0 });
+  }
+  return series;
+};
+
 // ─── Top brands (by units sold, then revenue) ────────────────────────────────
 
 export const getTopBrands = async (limit: number) => {

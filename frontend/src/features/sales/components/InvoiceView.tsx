@@ -3,10 +3,12 @@ import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { formatCurrency } from '@/shared/lib/currency';
 import { formatDate } from '@/shared/lib/dates';
-import type { SaleDetail } from '../types';
+import type { SaleDetail, InvoiceCompany } from '../types';
 
 interface InvoiceViewProps {
   sale: SaleDetail;
+  /** Company header block (from the /sales/:id/invoice payload or settings). */
+  company?: InvoiceCompany;
   onClose?: () => void;
 }
 
@@ -17,23 +19,36 @@ const STATUS_VARIANT = {
   DRAFT: 'secondary',
 } as const;
 
-export function InvoiceView({ sale, onClose }: InvoiceViewProps) {
+export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
+  const co = company ?? sale.company;
+  const vatNo = co?.vat_no ?? co?.gstin;
+
   return (
-    <div className="overflow-hidden rounded-sm border border-border bg-card text-sm shadow-panel print:border-0 print:shadow-none">
+    <div className="print-area overflow-hidden rounded-sm border border-border bg-card text-sm shadow-panel print:border-0 print:shadow-none">
       {/* Header band */}
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border bg-surface-2 px-6 py-5 print:bg-transparent">
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <span
             aria-hidden="true"
             className="grid h-10 w-10 place-items-center rounded-sm bg-primary font-mono text-lg font-bold text-primary-foreground"
           >
-            T
+            {(co?.name ?? 'TyreStock').charAt(0).toUpperCase()}
           </span>
           <div className="leading-tight">
-            <div className="text-base font-bold tracking-tight">TyreStock</div>
-            <div className="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
-              Inventory · POS
-            </div>
+            <div className="text-base font-bold tracking-tight">{co?.name ?? 'TyreStock'}</div>
+            {co?.address ? (
+              <div className="mt-0.5 max-w-56 text-xs text-muted-foreground">{co.address}</div>
+            ) : (
+              <div className="font-mono text-[0.6rem] uppercase tracking-[0.18em] text-muted-foreground">
+                Inventory · POS
+              </div>
+            )}
+            {co?.phone && (
+              <div className="font-mono text-xs text-muted-foreground">{co.phone}</div>
+            )}
+            {vatNo && (
+              <div className="font-mono text-xs text-muted-foreground">VAT {vatNo}</div>
+            )}
           </div>
         </div>
 
@@ -63,17 +78,15 @@ export function InvoiceView({ sale, onClose }: InvoiceViewProps) {
 
       <div className="space-y-5 p-6">
         {/* Customer */}
-        {sale.customer && (
-          <div>
-            <div className="font-mono text-[0.62rem] uppercase tracking-[0.16em] text-muted-foreground">
-              Billed to
-            </div>
-            <p className="mt-1 font-semibold">{sale.customer.name}</p>
-            {sale.customer.phone && (
-              <p className="font-mono text-xs text-muted-foreground">{sale.customer.phone}</p>
-            )}
+        <div>
+          <div className="font-mono text-[0.62rem] uppercase tracking-[0.16em] text-muted-foreground">
+            Billed to
           </div>
-        )}
+          <p className="mt-1 font-semibold">{sale.customer?.name ?? 'Walk-in customer'}</p>
+          {sale.customer?.phone && (
+            <p className="font-mono text-xs text-muted-foreground">{sale.customer.phone}</p>
+          )}
+        </div>
 
         {/* Line items */}
         <table className="w-full border-collapse text-sm" aria-label="Invoice items">

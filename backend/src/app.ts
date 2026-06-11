@@ -17,6 +17,7 @@ import { productsRouter, variantsRouter } from './modules/products/products.rout
 import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { customersRouter } from './modules/customers/customers.routes';
 import { salesRouter } from './modules/sales/sales.routes';
+import { purchasesRouter, vendorsRouter, serialsRouter } from './modules/purchases/purchases.routes';
 import { alertsRouter } from './modules/alerts/alerts.routes';
 import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { reportsRouter } from './modules/reports/reports.routes';
@@ -57,6 +58,9 @@ app.use('/api/v1/variants', variantsRouter);
 app.use('/api/v1/inventory', inventoryRouter);
 app.use('/api/v1/customers', customersRouter);
 app.use('/api/v1/sales', salesRouter);
+app.use('/api/v1/purchases', purchasesRouter);
+app.use('/api/v1/vendors', vendorsRouter);
+app.use('/api/v1/serials', serialsRouter);
 app.use('/api/v1/alerts', alertsRouter);
 app.use('/api/v1/dashboard', dashboardRouter);
 app.use('/api/v1/reports', reportsRouter);

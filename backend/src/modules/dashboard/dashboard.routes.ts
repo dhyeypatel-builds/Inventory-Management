@@ -13,5 +13,6 @@ const read = requirePermission('dashboard:read');
 
 dashboardRouter.get('/summary', read, dashboardController.summary);
 dashboardRouter.get('/sales-trend', read, dashboardController.salesTrend);
+dashboardRouter.get('/revenue-series', read, dashboardController.revenueSeries);
 dashboardRouter.get('/top-brands', read, dashboardController.topBrands);
 dashboardRouter.get('/fast-moving', read, dashboardController.fastMoving);

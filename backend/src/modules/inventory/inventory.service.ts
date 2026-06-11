@@ -113,7 +113,11 @@ export const listInventory = async (query: ListInventoryQuery) => {
       where,
       skip,
       take,
-      orderBy: { variant: { product: { name: 'asc' } } },
+      // sort=qty puts out-of-stock first — the order a reorder list needs
+      orderBy:
+        query.sort === 'qty'
+          ? [{ quantity: 'asc' as const }, { variant: { product: { name: 'asc' as const } } }]
+          : { variant: { product: { name: 'asc' as const } } },
       include: inventoryInclude,
     }),
     prisma.inventory.count({ where }),

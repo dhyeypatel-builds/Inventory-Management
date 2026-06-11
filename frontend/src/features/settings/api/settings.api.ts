@@ -3,7 +3,6 @@ import type {
   Settings,
   UpdateSettingsInput,
   Brand,
-  BrandListResponse,
   Category,
 } from '../types';
 
@@ -20,8 +19,9 @@ export async function updateSettings(patch: UpdateSettingsInput): Promise<Settin
 // ─── Brands ───────────────────────────────────────────────────────────────────
 
 export async function listBrands(): Promise<Brand[]> {
-  const res = await api.get('/brands', { params: { pageSize: 200, includeInactive: true } });
-  return (res.data.data as BrandListResponse).brands;
+  // 100 is the backend's max page size; the array lives directly in `data`.
+  const res = await api.get('/brands', { params: { pageSize: 100, includeInactive: true } });
+  return res.data.data as Brand[];
 }
 
 export async function createBrand(data: { name: string }): Promise<Brand> {

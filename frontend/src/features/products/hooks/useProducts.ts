@@ -9,6 +9,8 @@ import {
   getProductTypeAttributes,
   listBrands,
   listCategories,
+  createBrand,
+  createCategory,
   type ListProductsParams,
 } from '../api/products.api';
 import type { ProductFormData } from '../types';
@@ -70,6 +72,26 @@ export function useCategories() {
     queryKey: productKeys.categories,
     queryFn: listCategories,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useCreateBrand() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => createBrand(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.brands });
+    },
+  });
+}
+
+export function useCreateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => createCategory(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.categories });
+    },
   });
 }
 

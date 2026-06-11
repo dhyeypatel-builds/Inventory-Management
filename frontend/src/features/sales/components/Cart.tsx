@@ -31,10 +31,11 @@ interface CartProps {
   items: CartItem[];
   onChangeQty: (variantId: string, qty: number) => void;
   onChangeDiscount: (variantId: string, discount: number) => void;
+  onChangeSerials?: (variantId: string, serialsText: string) => void;
   onRemove: (variantId: string) => void;
 }
 
-export function Cart({ items, onChangeQty, onChangeDiscount, onRemove }: CartProps) {
+export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, onRemove }: CartProps) {
   if (items.length === 0) {
     return (
       <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-border text-sm text-muted-foreground">
@@ -147,6 +148,16 @@ export function Cart({ items, onChangeQty, onChangeDiscount, onRemove }: CartPro
                 {formatCurrency(lineTotal)}
               </div>
             </div>
+
+            {onChangeSerials && (
+              <Input
+                className="h-8 font-mono text-xs"
+                placeholder="Serial nos (optional, comma-separated)"
+                value={item.serialsText ?? ''}
+                onChange={(e) => onChangeSerials(item.variantId, e.target.value)}
+                aria-label={`Serial numbers for ${item.description}`}
+              />
+            )}
           </div>
         );
       })}

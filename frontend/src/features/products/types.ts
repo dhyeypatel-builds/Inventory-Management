@@ -89,6 +89,7 @@ export interface ProductListItem {
   productType: { id: number; name: string };
   brand: { id: number; name: string } | null;
   category: { id: number; name: string } | null;
+  variants: { sku: string }[];
   _count: { variants: number };
   createdAt: string;
   updatedAt: string;

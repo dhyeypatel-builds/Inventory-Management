@@ -2,14 +2,21 @@ import { z } from 'zod';
 
 export const PAYMENT_MODES = ['CASH', 'CARD', 'BANK_TRANSFER'] as const;
 
-const saleItemSchema = z.object({
-  variantId: z.string().uuid(),
-  quantity: z.number().int().positive(),
-  // Optional price override; defaults to the variant's selling price (snapshot).
-  unitPrice: z.number().min(0).optional(),
-  // Per-line discount in currency units; validated against the line base server-side.
-  discount: z.number().min(0).default(0),
-});
+const saleItemSchema = z
+  .object({
+    variantId: z.string().uuid(),
+    quantity: z.number().int().positive(),
+    // Optional price override; defaults to the variant's selling price (snapshot).
+    unitPrice: z.number().min(0).optional(),
+    // Per-line discount in currency units; validated against the line base server-side.
+    discount: z.number().min(0).default(0),
+    // Optional per-unit serial numbers being sold (warranty tracing).
+    serials: z.array(z.string().trim().min(1).max(60)).max(500).default([]),
+  })
+  .refine((item) => item.serials.length <= item.quantity, {
+    message: 'More serial numbers than units sold',
+    path: ['serials'],
+  });
 
 export const createSaleSchema = z.object({
   customerId: z.string().uuid().optional().nullable(),

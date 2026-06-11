@@ -15,7 +15,7 @@ import { Dialog, DialogContent } from '@/shared/ui/dialog';
 import { formatCurrency } from '@/shared/lib/currency';
 import { formatDateTime } from '@/shared/lib/dates';
 import { DateRangePicker } from '@/features/reports/components/DateRangePicker';
-import { useSales, useSale } from '../hooks/useSales';
+import { useSales, useSale, useSaleInvoice } from '../hooks/useSales';
 import { InvoiceView } from './InvoiceView';
 
 const STATUS_VARIANT: Record<string, 'success' | 'outline' | 'destructive' | 'secondary'> = {
@@ -39,6 +39,7 @@ export function SalesHistory() {
   });
 
   const { data: invoiceSale } = useSale(viewId ?? '');
+  const { data: invoicePayload } = useSaleInvoice(viewId ?? '');
 
   const items = data?.items ?? [];
   const meta = data?.meta;
@@ -158,9 +159,13 @@ export function SalesHistory() {
 
       {/* Invoice modal */}
       <Dialog open={!!viewId} onOpenChange={(o) => !o && setViewId(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="print-dialog max-w-3xl max-h-[90vh] overflow-y-auto">
           {invoiceSale && (
-            <InvoiceView sale={invoiceSale} onClose={() => setViewId(null)} />
+            <InvoiceView
+              sale={invoiceSale}
+              company={invoicePayload?.company}
+              onClose={() => setViewId(null)}
+            />
           )}
         </DialogContent>
       </Dialog>

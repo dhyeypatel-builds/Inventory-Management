@@ -4,6 +4,7 @@ import type {
   SaleDetail,
   SaleListResponse,
   CreateSalePayload,
+  Customer,
   CustomerListResponse,
 } from '../types';
 
@@ -69,4 +70,10 @@ export async function cancelSale(id: string): Promise<SaleDetail> {
 export async function searchCustomers(q: string): Promise<CustomerListResponse> {
   const res = await api.get('/customers', { params: { q, pageSize: 20 } });
   return { customers: res.data.data, meta: res.data.meta } as CustomerListResponse;
+}
+
+/** Creates a walk-in customer from the POS picker so the sale is never left unlinked. */
+export async function createCustomer(data: { name: string; phone?: string }): Promise<Customer> {
+  const res = await api.post('/customers', data);
+  return res.data.data as Customer;
 }

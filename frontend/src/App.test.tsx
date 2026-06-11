@@ -16,7 +16,7 @@ function renderAt(path: string) {
 describe('App routing', () => {
   it('shows the public landing page on an unauthenticated visit to "/"', async () => {
     const router = renderAt('/');
-    expect(await screen.findByRole('button', { name: /book a demo/i })).toBeInTheDocument();
+    expect((await screen.findAllByRole('link', { name: /sign in/i })).length).toBeGreaterThan(0);
     expect(router.state.location.pathname).toBe('/');
   });
 

@@ -8,6 +8,7 @@ export const listInventoryQuerySchema = z.object({
     .string()
     .optional()
     .transform((v) => v === 'true'),
+  sort: z.enum(['name', 'qty']).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });

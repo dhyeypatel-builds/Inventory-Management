@@ -2,6 +2,7 @@ import { TrendingUp, Boxes, Package, AlertTriangle, PoundSterling } from 'lucide
 import { Button } from '@/shared/ui/button';
 import { formatCurrency } from '@/shared/lib/currency';
 import { KpiCard } from '../components/KpiCard';
+import { RevenueBarChart } from '../components/RevenueBarChart';
 import { SalesTrendChart } from '../components/SalesTrendChart';
 import { TopBrandsList } from '../components/TopBrandsList';
 import { LowStockList } from '../components/LowStockList';
@@ -78,12 +79,15 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Chart + side lists */}
+      {/* Charts (left) + action lists (right) */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <SalesTrendChart data={trend.data} loading={trend.isLoading} error={trend.isError} />
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          <RevenueBarChart />
+          <SalesTrendChart data={trend.data} loading={trend.isLoading} error={trend.isError} />
+        </div>
         <div className="space-y-4">
-          <TopBrandsList data={topBrands.data} loading={topBrands.isLoading} />
           <LowStockList data={lowStock.data} loading={lowStock.isLoading} />
+          <TopBrandsList data={topBrands.data} loading={topBrands.isLoading} />
         </div>
       </div>
     </div>

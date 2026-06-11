@@ -21,6 +21,10 @@ const PERMISSIONS = [
   'sale:return',
   'customer:read',
   'customer:write',
+  'purchase:read',
+  'purchase:create',
+  'vendor:read',
+  'vendor:write',
   'dashboard:read',
   'report:read',
   'report:export',
@@ -195,7 +199,8 @@ async function main(): Promise<void> {
       description: 'Catalog and stock management',
       permissions: [
         'catalog:read', 'catalog:write', 'product:read', 'product:write', 'inventory:read',
-        'inventory:write', 'alert:read', 'alert:acknowledge', 'dashboard:read', 'report:read',
+        'inventory:write', 'purchase:read', 'purchase:create', 'vendor:read', 'vendor:write',
+        'alert:read', 'alert:acknowledge', 'dashboard:read', 'report:read',
       ],
     },
     {

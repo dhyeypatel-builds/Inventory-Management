@@ -67,7 +67,7 @@ export function ProductListPage() {
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search products…"
+            placeholder="Search by name or size (R15, R14…)"
             className="pl-8"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}

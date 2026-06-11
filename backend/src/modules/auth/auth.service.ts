@@ -75,9 +75,13 @@ export async function signRefreshToken(
   return { token, tokenId };
 }
 
+/** Reuse of a just-rotated token within this window is treated as a benign race. */
+const REFRESH_REUSE_GRACE_MS = 30_000;
+
 /**
  * Validates a refresh token, revokes it, and issues a fresh pair.
- * Reuse of a revoked token triggers a full-family revocation (token theft signal).
+ * Reuse of a revoked token triggers a full-family revocation (token theft signal),
+ * unless the reuse happens within a short grace window (parallel-tab race).
  */
 export async function rotateRefreshToken(
   token: string,
@@ -96,7 +100,18 @@ export async function rotateRefreshToken(
   }
 
   if (stored.revokedAt !== null) {
-    // Possible token theft — revoke all active tokens for this user
+    // A rotation-consumed token reused moments later is almost always a benign
+    // race (two tabs refreshing at once, or a retried request) — not theft.
+    // Issue a fresh pair instead of nuking the session. Tokens revoked by
+    // logout/suspension (no replacedById) never qualify.
+    const reuseAgeMs = Date.now() - stored.revokedAt.getTime();
+    if (stored.replacedById !== null && reuseAgeMs <= REFRESH_REUSE_GRACE_MS) {
+      const next = await signRefreshToken(stored.userId);
+      return { ...next, userId: stored.userId };
+    }
+
+    // Stale or non-rotation reuse — possible token theft. Revoke all active
+    // tokens for this user.
     await prisma.refreshToken.updateMany({
       where: { userId: stored.userId, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -108,13 +123,14 @@ export async function rotateRefreshToken(
     throw new UnauthorizedError('Refresh token has expired');
   }
 
-  // Revoke consumed token
+  const next = await signRefreshToken(stored.userId);
+
+  // Revoke the consumed token, marking it as rotated (vs logout/suspend)
   await prisma.refreshToken.update({
     where: { id: payload.jti },
-    data: { revokedAt: new Date() },
+    data: { revokedAt: new Date(), replacedById: next.tokenId },
   });
 
-  const next = await signRefreshToken(stored.userId);
   return { ...next, userId: stored.userId };
 }
 

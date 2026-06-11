@@ -105,6 +105,7 @@ export const createSale = async (
       lineTax,
       lineTotal,
       lineBase,
+      serials: item.serials ?? [],
     };
   });
 
@@ -145,18 +146,39 @@ export const createSale = async (
 
           // Sale items are created separately (not nested) so the tenancy
           // extension stamps each row's tenant_id; nested creates bypass it.
-          await tx.saleItem.createMany({
-            data: lines.map((l) => ({
-              saleId: sale.id,
-              variantId: l.variantId,
-              description: l.description,
-              quantity: l.quantity,
-              unitPrice: l.unitPrice,
-              discount: l.discount,
-              taxRatePct: l.taxRatePct,
-              lineTotal: l.lineTotal,
-            })),
-          });
+          // One-by-one (not createMany) because serial numbers anchor to item ids.
+          for (const l of lines) {
+            const item = await tx.saleItem.create({
+              data: {
+                saleId: sale.id,
+                variantId: l.variantId,
+                description: l.description,
+                quantity: l.quantity,
+                unitPrice: l.unitPrice,
+                discount: l.discount,
+                taxRatePct: l.taxRatePct,
+                lineTotal: l.lineTotal,
+              },
+            });
+
+            // Claim the sold units' serial numbers (must be IN_STOCK for this variant).
+            if (l.serials.length > 0) {
+              const claimed = await tx.serialNumber.updateMany({
+                where: {
+                  serialNo: { in: l.serials },
+                  variantId: l.variantId,
+                  status: 'IN_STOCK',
+                },
+                data: { status: 'SOLD', saleItemId: item.id },
+              });
+              if (claimed.count !== l.serials.length) {
+                throw new ValidationError(
+                  `One or more serial numbers are unknown or not in stock for ${l.description}`,
+                  { variantId: l.variantId, serials: l.serials },
+                );
+              }
+            }
+          }
 
           // Authoritative stock check + decrement inside the serializable txn.
           for (const [variantId, requested] of qtyByVariant) {
@@ -348,6 +370,12 @@ export const cancelSale = async (id: string, actorId?: string) => {
       });
     }
 
+    // Units come back into stock — release their serial numbers.
+    await tx.serialNumber.updateMany({
+      where: { saleItemId: { in: sale.items.map((i) => i.id) }, status: 'SOLD' },
+      data: { status: 'IN_STOCK', saleItemId: null },
+    });
+
     await tx.sale.update({ where: { id }, data: { status: 'CANCELLED' } });
   });
 
@@ -417,6 +445,16 @@ export const returnSale = async (id: string, data: ReturnSaleInput, actorId?: st
           note: `Return: ${sale.invoiceNo}`,
           createdBy: actorId ?? null,
         },
+      });
+    }
+
+    // Mark returned units' serials. On a partial return the specific units
+    // are unknown — staff flag individual serials via PATCH /serials/:serialNo.
+    const isFullReturn = !data.items || data.items.length === 0;
+    if (isFullReturn) {
+      await tx.serialNumber.updateMany({
+        where: { saleItemId: { in: sale.items.map((i) => i.id) }, status: 'SOLD' },
+        data: { status: 'RETURNED' },
       });
     }
 

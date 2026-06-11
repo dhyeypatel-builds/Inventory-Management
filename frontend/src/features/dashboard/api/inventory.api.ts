@@ -11,6 +11,7 @@ export interface LowStockItem {
 
 export async function getLowStockItems(pageSize = 8): Promise<LowStockItem[]> {
   // The inventory list returns the array directly in `data` (with `meta` alongside).
-  const res = await api.get('/inventory', { params: { lowStock: true, pageSize } });
+  // sort=qty → out-of-stock items first, then lowest quantities.
+  const res = await api.get('/inventory', { params: { lowStock: true, sort: 'qty', pageSize } });
   return (res.data.data ?? []) as LowStockItem[];
 }

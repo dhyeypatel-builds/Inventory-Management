@@ -15,7 +15,19 @@ import {
 } from '@/shared/ui/select';
 import { toast } from '@/shared/ui/use-toast';
 import { VariantEditor } from './VariantEditor';
-import { useProductTypes, useProductTypeAttributes, useBrands, useCategories, useCreateProduct } from '../hooks/useProducts';
+import { QuickAddDialog } from './QuickAddDialog';
+import { createBrand, createCategory } from '../api/products.api';
+import { useQueryClient } from '@tanstack/react-query';
+import { productKeys } from '../hooks/useProducts';
+import {
+  useProductTypes,
+  useProductTypeAttributes,
+  useBrands,
+  useCategories,
+  useCreateProduct,
+  useUpdateProduct,
+  useProduct,
+} from '../hooks/useProducts';
 import type { ProductFormData } from '../types';
 
 interface ProductFormProps {
@@ -23,8 +35,10 @@ interface ProductFormProps {
   productId?: string;
 }
 
-export function ProductForm({ defaultValues }: ProductFormProps) {
+export function ProductForm({ defaultValues, productId }: ProductFormProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const isEdit = !!productId;
   const [selectedTypeId, setSelectedTypeId] = useState<number | undefined>(
     defaultValues?.productTypeId,
   );
@@ -33,7 +47,9 @@ export function ProductForm({ defaultValues }: ProductFormProps) {
   const { data: attributes = [] } = useProductTypeAttributes(selectedTypeId);
   const { data: brands = [] } = useBrands();
   const { data: categories = [] } = useCategories();
+  const { data: existing } = useProduct(productId ?? '');
   const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct(productId ?? '');
 
   const methods = useForm<ProductFormData>({
     defaultValues: {
@@ -60,10 +76,34 @@ export function ProductForm({ defaultValues }: ProductFormProps) {
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = methods;
 
   const watchedTypeId = watch('productTypeId');
+
+  // Edit mode: prefill the form once the existing product loads
+  useEffect(() => {
+    if (!existing) return;
+    setSelectedTypeId(existing.productType.id);
+    reset({
+      productTypeId: existing.productType.id,
+      brandId: existing.brand?.id,
+      categoryId: existing.category?.id,
+      name: existing.name,
+      description: existing.description ?? '',
+      warrantyMonths: existing.warrantyMonths ?? undefined,
+      variant: {
+        sku: '',
+        purchasePrice: 0,
+        sellingPrice: 0,
+        taxRatePct: 0,
+        openingStock: 0,
+        reorderLevel: 5,
+        attributes: {},
+      },
+    });
+  }, [existing, reset]);
 
   // Sync controlled Select → RHF field
   useEffect(() => {
@@ -79,8 +119,19 @@ export function ProductForm({ defaultValues }: ProductFormProps) {
 
   async function onSubmit(data: ProductFormData) {
     try {
-      await createProduct.mutateAsync(data);
-      toast({ title: 'Product created', variant: 'success' });
+      if (isEdit) {
+        await updateProduct.mutateAsync({
+          name: data.name,
+          brandId: data.brandId,
+          categoryId: data.categoryId,
+          description: data.description || undefined,
+          warrantyMonths: Number.isFinite(data.warrantyMonths) ? data.warrantyMonths : undefined,
+        });
+        toast({ title: 'Product updated', variant: 'success' });
+      } else {
+        await createProduct.mutateAsync(data);
+        toast({ title: 'Product created', variant: 'success' });
+      }
       navigate('/products');
     } catch (err: unknown) {
       const msg =
@@ -101,7 +152,7 @@ export function ProductForm({ defaultValues }: ProductFormProps) {
           <Select
             value={selectedTypeId ? String(selectedTypeId) : ''}
             onValueChange={(v) => setSelectedTypeId(Number(v))}
-            disabled={typesLoading}
+            disabled={typesLoading || isEdit}
           >
             <SelectTrigger id="productTypeId" aria-label="Product Type">
               <SelectValue placeholder="Select product type" />
@@ -139,40 +190,60 @@ export function ProductForm({ defaultValues }: ProductFormProps) {
 
           <div className="space-y-1.5">
             <Label htmlFor="brandId">Brand</Label>
-            <Select
-              value={watch('brandId') ? String(watch('brandId')) : ''}
-              onValueChange={(v) => setValue('brandId', Number(v))}
-            >
-              <SelectTrigger id="brandId" aria-label="Brand">
-                <SelectValue placeholder="Select brand" />
-              </SelectTrigger>
-              <SelectContent>
-                {brands.map((b) => (
-                  <SelectItem key={b.id} value={String(b.id)}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1.5">
+              <Select
+                value={watch('brandId') ? String(watch('brandId')) : ''}
+                onValueChange={(v) => setValue('brandId', Number(v))}
+              >
+                <SelectTrigger id="brandId" aria-label="Brand" className="flex-1">
+                  <SelectValue placeholder="Select brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {brands.map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <QuickAddDialog
+                entity="brand"
+                onCreate={createBrand}
+                onCreated={(id) => {
+                  void queryClient.invalidateQueries({ queryKey: productKeys.brands });
+                  setValue('brandId', id);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="categoryId">Category</Label>
-            <Select
-              value={watch('categoryId') ? String(watch('categoryId')) : ''}
-              onValueChange={(v) => setValue('categoryId', Number(v))}
-            >
-              <SelectTrigger id="categoryId" aria-label="Category">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1.5">
+              <Select
+                value={watch('categoryId') ? String(watch('categoryId')) : ''}
+                onValueChange={(v) => setValue('categoryId', Number(v))}
+              >
+                <SelectTrigger id="categoryId" aria-label="Category" className="flex-1">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <QuickAddDialog
+                entity="category"
+                onCreate={createCategory}
+                onCreated={(id) => {
+                  void queryClient.invalidateQueries({ queryKey: productKeys.categories });
+                  setValue('categoryId', id);
+                }}
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -191,20 +262,42 @@ export function ProductForm({ defaultValues }: ProductFormProps) {
           </div>
         </div>
 
-        {/* Variant editor (only shown when a type is selected) */}
-        {selectedTypeId && (
+        {/* Variant editor (create mode only — variants are edited from Inventory) */}
+        {!isEdit && selectedTypeId && (
           <VariantEditor attributes={attributes} />
         )}
 
-        {!selectedTypeId && (
+        {!isEdit && !selectedTypeId && (
           <p className="text-sm text-muted-foreground">
             Select a product type above to add variant details and attributes.
           </p>
         )}
 
+        {isEdit && existing && existing.variants.length > 0 && (
+          <div className="space-y-2">
+            <Label>Variants</Label>
+            <ul className="space-y-1">
+              {existing.variants.map((v) => (
+                <li
+                  key={v.id}
+                  className="flex items-center justify-between rounded-sm border border-border px-3 py-2 text-sm"
+                >
+                  <span className="font-mono">{v.sku}</span>
+                  <span className="font-mono tabular text-muted-foreground">
+                    Stock: {v.inventory?.quantity ?? 0}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              Stock and prices are managed from the Inventory screen.
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           <Button type="submit" disabled={isSubmitting || !selectedTypeId}>
-            {isSubmitting ? 'Saving…' : 'Save Product'}
+            {isSubmitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Product'}
           </Button>
           <Button type="button" variant="outline" onClick={() => navigate('/products')}>
             Cancel
