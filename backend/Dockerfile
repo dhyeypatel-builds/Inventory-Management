@@ -7,6 +7,10 @@ ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-alpine AS deps
 WORKDIR /app
 
+# Prisma's engines need libssl (openssl 3.x on Alpine) — without it the schema
+# engine fails to load and migrate/generate error out.
+RUN apk add --no-cache openssl
+
 COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/
 COPY backend/prisma ./backend/prisma
@@ -16,6 +20,9 @@ RUN npm ci --ignore-scripts -w backend
 # ── Stage 2: Build ─────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
+
+# libssl for the Prisma engine invoked by `prisma generate` below.
+RUN apk add --no-cache openssl
 
 # Workspace deps hoist to /app/node_modules EXCEPT where versions conflict
 # across workspaces (e.g. puppeteer-core) — those land in backend/node_modules,
@@ -40,6 +47,7 @@ ENV NODE_ENV=production
 # Chromium for branded-PDF rendering (Phase 2D). Use the system browser instead of
 # puppeteer's bundled download; fonts incl. the £ glyph + Noto for broad coverage.
 RUN apk add --no-cache \
+      openssl \
       chromium \
       nss \
       freetype \

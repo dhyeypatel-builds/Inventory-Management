@@ -1,24 +1,29 @@
 ARG NODE_VERSION=22
 
+# Build context is the REPO ROOT (npm workspaces — the lockfile lives there):
+#   docker build -f frontend/Dockerfile --target runner .
+
 # ── Stage 1: Build ─────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci --ignore-scripts
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
 
-COPY . .
+RUN npm ci --ignore-scripts -w frontend
+
+COPY frontend ./frontend
 
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=${VITE_API_URL}
 
-RUN npm run build
+RUN npm run build -w frontend
 
 # ── Stage 2: Serve with Nginx ──────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runner
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/frontend/dist /usr/share/nginx/html
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 RUN chown -R nginx:nginx /usr/share/nginx/html && \
     chmod -R 755 /usr/share/nginx/html
