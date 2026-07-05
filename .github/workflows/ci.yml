@@ -50,6 +50,10 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d tyrestock_test \
             -c 'CREATE EXTENSION IF NOT EXISTS citext;'
 
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
       - name: Migrate + seed test database
         working-directory: backend
         run: |
