@@ -51,6 +51,14 @@ services:
       - "${FRONTEND_PORT:-8080}:80"
     networks:
       - app-net
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.entrypoints=websecure"
+      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.tls=true"
+      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.tls.certresolver=letsencrypt"
+      - "traefik.http.services.${TRAEFIK_ROUTER:-tyrestock}.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:
@@ -59,3 +67,5 @@ volumes:
 networks:
   app-net:
     driver: bridge
+  web:
+    external: true
