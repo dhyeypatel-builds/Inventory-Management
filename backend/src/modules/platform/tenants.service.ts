@@ -13,6 +13,7 @@ function defaultSettings(shopName: string): { key: string; value: Prisma.InputJs
   return [
     { key: 'company.name', value: shopName },
     { key: 'company.phone', value: '' },
+    { key: 'company.email', value: '' },
     { key: 'company.address', value: '' },
     { key: 'company.vat_number', value: '' },
     { key: 'tax.default_pct', value: 20 },

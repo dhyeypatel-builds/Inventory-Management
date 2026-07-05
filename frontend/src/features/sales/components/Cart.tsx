@@ -8,14 +8,15 @@ import type { CartItem } from '../types';
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-export function computeTotals(items: CartItem[]) {
+export function computeTotals(items: CartItem[], vatRegistered = true) {
   let subtotal = 0;
   let discount = 0;
   let taxTotal = 0;
   for (const item of items) {
     const lineBase = round2(item.unitPrice * item.quantity);
     const taxable = round2(lineBase - item.discount);
-    const lineTax = round2((taxable * item.taxRatePct) / 100);
+    // Unregistered shops charge no VAT, mirroring the server-side rule.
+    const lineTax = vatRegistered ? round2((taxable * item.taxRatePct) / 100) : 0;
     subtotal += lineBase;
     discount += item.discount;
     taxTotal += lineTax;
@@ -33,10 +34,22 @@ interface CartProps {
   onChangeQty: (variantId: string, qty: number) => void;
   onChangeDiscount: (variantId: string, discount: number) => void;
   onChangeSerials?: (variantId: string, serialsText: string) => void;
+  /** Provided only when the user may override prices (sale:override_price). */
+  onChangePrice?: (variantId: string, unitPrice: number) => void;
+  /** When false (shop not VAT-registered), lines carry no tax. */
+  vatRegistered?: boolean;
   onRemove: (variantId: string) => void;
 }
 
-export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, onRemove }: CartProps) {
+export function Cart({
+  items,
+  onChangeQty,
+  onChangeDiscount,
+  onChangeSerials,
+  onChangePrice,
+  vatRegistered = true,
+  onRemove,
+}: CartProps) {
   if (items.length === 0) {
     return (
       <div className="flex h-44 flex-col items-center justify-center gap-2 rounded-sm border border-dashed border-border text-sm text-muted-foreground">
@@ -60,8 +73,9 @@ export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, on
       {items.map((item) => {
         const lineBase = round2(item.unitPrice * item.quantity);
         const taxable = round2(lineBase - item.discount);
-        const lineTax = round2((taxable * item.taxRatePct) / 100);
+        const lineTax = vatRegistered ? round2((taxable * item.taxRatePct) / 100) : 0;
         const lineTotal = round2(taxable + lineTax);
+        const isOverridden = round2(item.unitPrice) !== round2(item.listPrice);
 
         return (
           <div key={item.variantId} className="space-y-2.5 rounded-sm border border-border bg-card p-3 shadow-panel">
@@ -69,7 +83,15 @@ export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, on
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold">{item.description}</div>
                 <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-                  {formatCurrency(item.unitPrice)} ea · {item.taxRatePct}% tax
+                  {isOverridden ? (
+                    <>
+                      <span className="text-foreground">{formatCurrency(item.unitPrice)}</span>{' '}
+                      <span className="line-through">{formatCurrency(item.listPrice)}</span> ea
+                    </>
+                  ) : (
+                    <>{formatCurrency(item.unitPrice)} ea</>
+                  )}
+                  {vatRegistered && <> · {item.taxRatePct}% tax</>}
                 </div>
               </div>
               <Button
@@ -83,7 +105,7 @@ export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, on
               </Button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               {/* Qty stepper — buttons flank a typeable input */}
               <div className="flex items-center">
                 <Button
@@ -121,6 +143,34 @@ export function Cart({ items, onChangeQty, onChangeDiscount, onChangeSerials, on
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
+
+              {onChangePrice && (
+                <div className="flex items-center gap-1.5">
+                  <label
+                    className="font-mono text-[0.68rem] uppercase tracking-wide text-muted-foreground"
+                    htmlFor={`price-${item.variantId}`}
+                  >
+                    Price £
+                  </label>
+                  <Input
+                    id={`price-${item.variantId}`}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    className={cn(
+                      'h-9 w-24 font-mono tabular text-sm',
+                      isOverridden && 'border-primary text-foreground',
+                    )}
+                    value={item.unitPrice}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      if (!isNaN(v) && v >= 0) onChangePrice(item.variantId, round2(v));
+                    }}
+                    aria-label={`Unit price for ${item.description}`}
+                  />
+                </div>
+              )}
 
               <div className="flex items-center gap-1.5">
                 <label

@@ -171,7 +171,7 @@ describe('SettingsPage', () => {
 
     await waitFor(() => {
       expect(mockUpdateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ tax: { default_pct: 12 } }),
+        expect.objectContaining({ tax: { default_pct: 12, vat_registered: true } }),
       );
     });
   });

@@ -31,6 +31,8 @@ export interface CartItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  /** Catalogue selling price; unitPrice diverges from it on a manual override. */
+  listPrice: number;
   discount: number;
   taxRatePct: number;
   /** Optional comma-separated serial numbers being sold (warranty tracing). */
@@ -44,6 +46,8 @@ export interface SaleItemDetail {
   description: string;
   quantity: number;
   unitPrice: number;
+  /** Catalogue price at sale time; differs from unitPrice when overridden. Null on legacy rows. */
+  listPrice?: number | null;
   discount: number;
   taxRatePct: number;
   lineTotal: number;
@@ -53,6 +57,9 @@ export interface InvoiceCompany {
   name?: string;
   address?: string;
   phone?: string;
+  email?: string;
+  vat_number?: string;
+  /** Legacy keys kept for backward compatibility with older payloads. */
   gstin?: string;
   vat_no?: string;
   logo_url?: string;
@@ -63,6 +70,9 @@ export interface SaleDetail {
   invoiceNo: string;
   customerId: string | null;
   customer: { id: string; name: string; phone: string | null } | null;
+  /** Buyer snapshot — set for walk-ins (no linked customer) and linked sales alike. */
+  customerName?: string | null;
+  customerEmail?: string | null;
   status: SaleStatus;
   subtotal: number;
   discount: number;
@@ -100,6 +110,10 @@ export interface SaleListResponse {
 
 export interface CreateSalePayload {
   customerId?: string;
+  /** Walk-in buyer name (when no saved customer is linked). */
+  customerName?: string;
+  /** Walk-in buyer email (when no saved customer is linked). */
+  customerEmail?: string;
   paymentMode: PaymentMode;
   items: {
     variantId: string;

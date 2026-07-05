@@ -85,7 +85,7 @@ beforeAll(async () => {
     .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
   accessToken = loginRes.body.data.accessToken as string;
 
-  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Car Tyre' } });
+  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Tyre' } });
   productTypeId = carTyre.id;
   const mrf = await prisma.brand.findFirstOrThrow({ where: { name: 'MRF', deletedAt: null } });
   brandId = mrf.id;
@@ -294,6 +294,36 @@ describe('GET /api/v1/sales/:id/invoice', () => {
 
     // Cleanup customer.
     await prisma.customer.update({ where: { id: customerId }, data: { deletedAt: new Date() } });
+  });
+
+  it('charges no VAT and titles a plain invoice when the shop is not VAT-registered', async () => {
+    // Switch the shop to unregistered, then restore registration afterwards so
+    // sibling tests keep charging VAT.
+    const off = await request(app)
+      .patch('/api/v1/settings')
+      .set(auth())
+      .send({ tax: { vat_registered: false } });
+    expect(off.status).toBe(200);
+
+    try {
+      const saleId = await makeSale(variantA, 2);
+
+      // Sale itself carries no tax.
+      const saleRes = await request(app).get(`/api/v1/sales/${saleId}`).set(auth());
+      expect(saleRes.body.data.taxTotal).toBe(0);
+      expect(saleRes.body.data.grandTotal).toBe(3000); // 2 × 1500, no VAT
+      expect(saleRes.body.data.items[0].taxRatePct).toBe(0);
+
+      // Invoice payload reflects the unregistered status.
+      const invRes = await request(app).get(`/api/v1/sales/${saleId}/invoice`).set(auth());
+      expect(invRes.body.data.vatRegistered).toBe(false);
+      expect(invRes.body.data.taxTotal).toBe(0);
+    } finally {
+      await request(app)
+        .patch('/api/v1/settings')
+        .set(auth())
+        .send({ tax: { vat_registered: true } });
+    }
   });
 
   it('returns 404 for an unknown sale', async () => {

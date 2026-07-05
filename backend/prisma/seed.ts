@@ -60,7 +60,7 @@ interface AttributeDef {
   options: string[];
 }
 
-const CAR_TYRE_ATTRIBUTES: AttributeDef[] = [
+const TYRE_ATTRIBUTES: AttributeDef[] = [
   {
     code: 'size',
     label: 'Tyre Size',
@@ -78,15 +78,6 @@ const CAR_TYRE_ATTRIBUTES: AttributeDef[] = [
     isVariantDefining: true,
     displayOrder: 2,
     options: ['Tubeless', 'Tube Type', 'Radial', 'Bias'],
-  },
-  {
-    code: 'vehicle_type',
-    label: 'Vehicle Type',
-    datatype: 'ENUM',
-    isRequired: false,
-    isVariantDefining: false,
-    displayOrder: 3,
-    options: ['Hatchback', 'Sedan', 'SUV', 'Truck', 'Bike', 'Scooter', 'Tractor'],
   },
   {
     code: 'position',
@@ -285,14 +276,14 @@ async function main(): Promise<void> {
   }
   console.log(`  ✓ ${CATEGORIES.length} categories`);
 
-  // ─── Product Type: Car Tyre ────────────────────────────────────────────────
+  // ─── Product Type: Tyre ────────────────────────────────────────────────────
   const carTyreType = await prisma.productType.upsert({
-    where: { name: 'Car Tyre' },
+    where: { name: 'Tyre' },
     update: {},
-    create: { name: 'Car Tyre', isStockable: true },
+    create: { name: 'Tyre', isStockable: true },
   });
 
-  for (const attrDef of CAR_TYRE_ATTRIBUTES) {
+  for (const attrDef of TYRE_ATTRIBUTES) {
     const attr = await prisma.attribute.upsert({
       where: { productTypeId_code: { productTypeId: carTyreType.id, code: attrDef.code } },
       update: {},
@@ -315,7 +306,7 @@ async function main(): Promise<void> {
       });
     }
   }
-  console.log(`  ✓ Product type "Car Tyre" with ${CAR_TYRE_ATTRIBUTES.length} attributes`);
+  console.log(`  ✓ Product type "Tyre" with ${TYRE_ATTRIBUTES.length} attributes`);
 
   // ─── Default settings ──────────────────────────────────────────────────────
   for (const setting of DEFAULT_SETTINGS) {

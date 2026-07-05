@@ -4,6 +4,7 @@ import { isAxiosError } from 'axios';
 import { PackagePlus, Trash2, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
+import { DatePicker } from '@/shared/ui/date-picker';
 import { Label } from '@/shared/ui/label';
 import { Textarea } from '@/shared/ui/textarea';
 import { Separator } from '@/shared/ui/separator';
@@ -284,12 +285,11 @@ export function PurchaseEntryPage() {
                 <Label htmlFor="purch-invoice-date">
                   Invoice Date <span className="text-destructive">*</span>
                 </Label>
-                <Input
+                <DatePicker
                   id="purch-invoice-date"
-                  type="date"
-                  className="font-mono"
                   value={invoiceDate}
-                  onChange={(e) => setInvoiceDate(e.target.value)}
+                  onChange={setInvoiceDate}
+                  toYear={new Date().getFullYear()}
                 />
               </div>
             </div>

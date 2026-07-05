@@ -17,6 +17,7 @@ import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import { Label } from '@/shared/ui/label';
 import { toast } from '@/shared/ui/use-toast';
+import { copyToClipboard } from '@/shared/lib/clipboard';
 import { useProvisionTenant } from '../hooks/useTenants';
 import type { ProvisionResult } from '../types';
 
@@ -45,12 +46,11 @@ function InviteLink({ result }: { result: ProvisionResult }) {
   const link = `${window.location.origin}${result.invite.path}`;
 
   const copy = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(link);
+    if (await copyToClipboard(link)) {
       setCopied(true);
       toast({ title: 'Invite link copied', variant: 'success' });
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       toast({ title: 'Could not copy', description: 'Copy the link manually.', variant: 'destructive' });
     }
   };

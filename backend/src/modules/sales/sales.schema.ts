@@ -20,8 +20,17 @@ const saleItemSchema = z
 
 export const createSaleSchema = z.object({
   customerId: z.string().uuid().optional().nullable(),
+  // Walk-in buyer (no saved Customer): name shown on the invoice, email used to
+  // send it. Ignored when customerId is set (the linked customer is snapshotted).
+  customerName: z.string().trim().min(1).max(120).optional().nullable(),
+  customerEmail: z.string().email().optional().nullable(),
   paymentMode: z.enum(PAYMENT_MODES),
   items: z.array(saleItemSchema).min(1, 'At least one item is required'),
+});
+
+// Email an existing sale's invoice (PDF) to an address.
+export const emailInvoiceSchema = z.object({
+  email: z.string().email(),
 });
 
 export const saleIdSchema = z.object({
@@ -51,3 +60,4 @@ export type CreateSaleInput = z.infer<typeof createSaleSchema>;
 export type SaleItemInput = z.infer<typeof saleItemSchema>;
 export type ListSalesQuery = z.infer<typeof listSalesQuerySchema>;
 export type ReturnSaleInput = z.infer<typeof returnSaleSchema>;
+export type EmailInvoiceInput = z.infer<typeof emailInvoiceSchema>;

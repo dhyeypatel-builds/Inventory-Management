@@ -66,13 +66,13 @@ describe('Seed data (A-05 integration)', () => {
     expect(count).toBeGreaterThanOrEqual(6);
   });
 
-  it('has Car Tyre product type with 6 attributes', async () => {
+  it('has Tyre product type with 5 attributes', async () => {
     const pt = await prisma.productType.findUnique({
-      where: { name: 'Car Tyre' },
+      where: { name: 'Tyre' },
       include: { attributes: { include: { options: true } } },
     });
     expect(pt).not.toBeNull();
-    expect(pt?.attributes.length).toBe(6);
+    expect(pt?.attributes.length).toBe(5);
 
     const sizeAttr = pt?.attributes.find((a) => a.code === 'size');
     expect(sizeAttr).toBeDefined();

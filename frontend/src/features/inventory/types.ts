@@ -24,6 +24,22 @@ export interface InventoryListResponse {
   };
 }
 
+export interface ValuationBucket {
+  brandId?: number | null;
+  brandName?: string;
+  categoryId?: number | null;
+  categoryName?: string;
+  totalQty: number;
+  totalValue: number;
+}
+
+export interface Valuation {
+  /** Total cost value of stock on hand (Σ quantity × purchase price). */
+  totalValue: number;
+  byBrand: ValuationBucket[];
+  byCategory: ValuationBucket[];
+}
+
 export interface Movement {
   id: string;
   type: string;

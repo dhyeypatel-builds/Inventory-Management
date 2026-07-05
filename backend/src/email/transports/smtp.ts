@@ -25,9 +25,15 @@ export class SmtpEmailTransport implements EmailTransport {
     await this.transporter.sendMail({
       from: env.EMAIL_FROM,
       to: message.to,
+      replyTo: message.replyTo,
       subject: message.subject,
       html: message.html,
       text: message.text,
+      attachments: message.attachments?.map((a) => ({
+        filename: a.filename,
+        content: a.content,
+        contentType: a.contentType,
+      })),
     });
     logger.info({ to: message.to, subject: message.subject }, '📧 email sent via SMTP');
   }

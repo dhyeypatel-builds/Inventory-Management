@@ -241,8 +241,8 @@ async function main(): Promise<void> {
   const categories = await prisma.category.findMany();
   const catMap = new Map(categories.map((c) => [c.slug, c.id]));
 
-  const carTyreType = await prisma.productType.findUnique({ where: { name: 'Car Tyre' } });
-  if (!carTyreType) throw new Error('Product type "Car Tyre" not found — run master seed first.');
+  const carTyreType = await prisma.productType.findUnique({ where: { name: 'Tyre' } });
+  if (!carTyreType) throw new Error('Product type "Tyre" not found — run master seed first.');
 
   const attributes = await prisma.attribute.findMany({
     where: { productTypeId: carTyreType.id },
@@ -327,10 +327,6 @@ async function main(): Promise<void> {
           const tyreTypeAttr = attrByCode.get('tyre_type')!;
           attrValues.push({ variantId: created.id, attributeId: tyreTypeAttr.id, optionId: optionId('tyre_type', v.tyreType) });
 
-          if (v.vehicleType) {
-            const attr = attrByCode.get('vehicle_type')!;
-            attrValues.push({ variantId: created.id, attributeId: attr.id, optionId: optionId('vehicle_type', v.vehicleType) });
-          }
           if (v.position) {
             const attr = attrByCode.get('position')!;
             attrValues.push({ variantId: created.id, attributeId: attr.id, optionId: optionId('position', v.position) });

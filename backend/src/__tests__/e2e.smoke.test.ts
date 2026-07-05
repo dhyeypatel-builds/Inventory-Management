@@ -80,7 +80,7 @@ describe('I-02 end-to-end smoke flow', () => {
   });
 
   it('2. creates a product with a variant and opening stock', async () => {
-    const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Car Tyre' } });
+    const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Tyre' } });
     const mrf = await prisma.brand.findFirstOrThrow({ where: { name: 'MRF', deletedAt: null } });
 
     const res = await request(app)

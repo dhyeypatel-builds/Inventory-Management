@@ -78,7 +78,7 @@ async function createSale(token: string, variantId: string, customerId?: string)
 }
 
 beforeAll(async () => {
-  const carTyre = await prismaBase.productType.findFirstOrThrow({ where: { name: 'Car Tyre' } });
+  const carTyre = await prismaBase.productType.findFirstOrThrow({ where: { name: 'Tyre' } });
   productTypeId = carTyre.id;
 
   const a = await provisionTenant('iso-a', EMAIL_A);

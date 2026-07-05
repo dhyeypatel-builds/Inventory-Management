@@ -1,7 +1,8 @@
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, Controller } from 'react-hook-form';
 import { Label } from '@/shared/ui/label';
 import { Input } from '@/shared/ui/input';
 import { Separator } from '@/shared/ui/separator';
+import { DatePicker } from '@/shared/ui/date-picker';
 import { DynamicAttributeForm } from './DynamicAttributeForm';
 import type { Attribute } from '../types';
 
@@ -13,6 +14,7 @@ interface VariantEditorProps {
 export function VariantEditor({ attributes, suggestedSku }: VariantEditorProps) {
   const {
     register,
+    control,
     formState: { errors },
   } = useFormContext();
 
@@ -136,7 +138,18 @@ export function VariantEditor({ attributes, suggestedSku }: VariantEditorProps) 
 
         <div className="space-y-1.5">
           <Label htmlFor="variant.manufacturingDate">Manufacturing Date</Label>
-          <Input id="variant.manufacturingDate" type="date" {...register('variant.manufacturingDate')} />
+          <Controller
+            control={control}
+            name="variant.manufacturingDate"
+            render={({ field }) => (
+              <DatePicker
+                id="variant.manufacturingDate"
+                value={(field.value as string) ?? ''}
+                onChange={field.onChange}
+                toYear={new Date().getFullYear()}
+              />
+            )}
+          />
         </div>
       </div>
 

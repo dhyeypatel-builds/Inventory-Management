@@ -1,6 +1,7 @@
 export interface CompanySettings {
   name?: string;
   phone?: string;
+  email?: string;
   address?: string;
   vat_number?: string;
   logo_url?: string;
@@ -8,13 +9,13 @@ export interface CompanySettings {
 
 export interface Settings {
   company?: CompanySettings;
-  tax?: { default_pct?: number };
+  tax?: { default_pct?: number; vat_registered?: boolean };
   inventory?: { default_reorder_level?: number };
 }
 
 export interface UpdateSettingsInput {
   company?: Partial<CompanySettings>;
-  tax?: { default_pct?: number };
+  tax?: { default_pct?: number; vat_registered?: boolean };
   inventory?: { default_reorder_level?: number };
 }
 

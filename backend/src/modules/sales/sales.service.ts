@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma, type TxClient } from '../../db/prisma';
 import {
+  AppError,
   ConflictError,
   ForbiddenError,
   InsufficientStockError,
@@ -9,9 +10,22 @@ import {
 } from '../../utils/errors';
 import { parsePagination, buildMeta } from '../../utils/pagination';
 import { reevaluateVariants } from '../alerts/alerts.service';
+import { getReportBranding } from '../reports/branding';
+import { htmlToPdf } from '../../render/pdf.service';
+import { sendInvoiceEmail } from '../../email';
+import { renderInvoiceHtml, INVOICE_FOOTER_HTML } from './invoice-html';
 import type { CreateSaleInput, ListSalesQuery, ReturnSaleInput } from './sales.schema';
 
 const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
+// A shop is VAT-registered unless it has explicitly opted out in settings.
+// Defaulting to true keeps VAT charged for shops provisioned before this flag
+// existed; only an explicit `false` switches off VAT (UK: unregistered traders
+// must not charge VAT or issue tax invoices).
+async function isVatRegistered(): Promise<boolean> {
+  const row = await prisma.setting.findFirst({ where: { key: 'tax.vat_registered' } });
+  return row?.value !== false;
+}
 
 // Concurrent sales contend on sequential invoice numbering and serializable
 // row locks; such conflicts are transient, so retry the transaction a few
@@ -49,12 +63,18 @@ export const createSale = async (
     if (existing) return getSale(existing.id);
   }
 
-  // Validate customer (if any) up front.
+  // Validate customer (if any) up front, and snapshot the buyer onto the sale.
+  // A linked customer's name/email are copied so the invoice stays stable even
+  // if the customer record later changes; a walk-in supplies them inline.
+  let customerName = data.customerName?.trim() || null;
+  let customerEmail = data.customerEmail?.trim() || null;
   if (data.customerId) {
     const customer = await prisma.customer.findFirst({
       where: { id: data.customerId, deletedAt: null },
     });
     if (!customer) throw new NotFoundError('Customer');
+    customerName = customer.name;
+    customerEmail = customer.email;
   }
 
   // Aggregate requested quantity per variant (a variant may appear in >1 line).
@@ -81,6 +101,8 @@ export const createSale = async (
 
   // Build line items with price/description snapshots and per-line totals.
   const canOverridePrice = actorPermissions.includes('sale:override_price');
+  // Unregistered shops charge no VAT, whatever the variant's listed rate.
+  const vatRegistered = await isVatRegistered();
   const lines = data.items.map((item) => {
     const variant = variantMap.get(item.variantId)!;
     const unitPrice = item.unitPrice ?? Number(variant.sellingPrice);
@@ -90,7 +112,7 @@ export const createSale = async (
     if (unitPrice !== Number(variant.sellingPrice) && !canOverridePrice) {
       throw new ForbiddenError('Changing the unit price requires price-override permission');
     }
-    const taxRatePct = Number(variant.taxRatePct);
+    const taxRatePct = vatRegistered ? Number(variant.taxRatePct) : 0;
     const lineBase = round2(unitPrice * item.quantity);
 
     if (item.discount > lineBase) {
@@ -109,6 +131,7 @@ export const createSale = async (
       description: `${variant.product.name} (${variant.sku})`,
       quantity: item.quantity,
       unitPrice,
+      listPrice: Number(variant.sellingPrice),
       discount: item.discount,
       taxRatePct,
       lineTax,
@@ -142,6 +165,8 @@ export const createSale = async (
             data: {
               invoiceNo,
               customerId: data.customerId ?? null,
+              customerName,
+              customerEmail,
               status: 'CONFIRMED',
               subtotal,
               discount,
@@ -164,6 +189,7 @@ export const createSale = async (
                 description: l.description,
                 quantity: l.quantity,
                 unitPrice: l.unitPrice,
+                listPrice: l.listPrice,
                 discount: l.discount,
                 taxRatePct: l.taxRatePct,
                 lineTotal: l.lineTotal,
@@ -261,6 +287,9 @@ function formatSale(sale: any) {
     customer: sale.customer
       ? { id: sale.customer.id, name: sale.customer.name, phone: sale.customer.phone }
       : null,
+    // Buyer snapshot — present for walk-ins (no linked customer) too.
+    customerName: sale.customerName ?? sale.customer?.name ?? null,
+    customerEmail: sale.customerEmail ?? null,
     status: sale.status,
     subtotal: Number(sale.subtotal),
     discount: Number(sale.discount),
@@ -276,6 +305,7 @@ function formatSale(sale: any) {
       description: it.description,
       quantity: it.quantity,
       unitPrice: Number(it.unitPrice),
+      listPrice: it.listPrice != null ? Number(it.listPrice) : null,
       discount: Number(it.discount),
       taxRatePct: Number(it.taxRatePct),
       lineTotal: Number(it.lineTotal),
@@ -478,6 +508,8 @@ export const returnSale = async (id: string, data: ReturnSaleInput, actorId?: st
 
 // ─── Invoice (printable payload) ─────────────────────────────────────────────
 
+export type SaleInvoice = Awaited<ReturnType<typeof getSaleInvoice>>;
+
 export const getSaleInvoice = async (id: string) => {
   const sale = await prisma.sale.findUnique({
     where: { id },
@@ -498,27 +530,44 @@ export const getSaleInvoice = async (id: string) => {
     company[s.key.replace('company.', '')] = s.value;
   }
 
+  // A walk-in has no linked Customer but may carry a snapshot name/email.
+  const isWalkIn = !sale.customer;
+  const customer = sale.customer
+    ? {
+        name: sale.customer.name,
+        phone: sale.customer.phone,
+        email: sale.customer.email,
+        vatNumber: sale.customer.vatNumber,
+        address: sale.customer.address,
+        vehicleNo: sale.customer.vehicleNo,
+      }
+    : sale.customerName || sale.customerEmail
+      ? {
+          name: sale.customerName,
+          phone: null,
+          email: sale.customerEmail,
+          vatNumber: null,
+          address: null,
+          vehicleNo: null,
+        }
+      : null;
+
   return {
     invoiceNo: sale.invoiceNo,
     status: sale.status,
     soldAt: sale.soldAt,
     paymentMode: sale.paymentMode,
     company,
-    customer: sale.customer
-      ? {
-          name: sale.customer.name,
-          phone: sale.customer.phone,
-          email: sale.customer.email,
-          vatNumber: sale.customer.vatNumber,
-          address: sale.customer.address,
-          vehicleNo: sale.customer.vehicleNo,
-        }
-      : null,
+    // Drives the document title ("TAX INVOICE" vs "INVOICE") and whether VAT is shown.
+    vatRegistered: await isVatRegistered(),
+    isWalkIn,
+    customer,
     items: sale.items.map((it) => ({
       description: it.description,
       sku: it.variant?.sku ?? null,
       quantity: it.quantity,
       unitPrice: Number(it.unitPrice),
+      listPrice: it.listPrice != null ? Number(it.listPrice) : null,
       discount: Number(it.discount),
       taxRatePct: Number(it.taxRatePct),
       lineTotal: Number(it.lineTotal),
@@ -531,4 +580,40 @@ export const getSaleInvoice = async (id: string) => {
       ? { id: sale.createdByUser.id, fullName: sale.createdByUser.fullName }
       : null,
   };
+};
+
+// ─── Email invoice (branded PDF attachment) ──────────────────────────────────
+
+/**
+ * Renders the sale's invoice to a branded PDF and emails it to `email`. Works
+ * for any sale (linked customer or walk-in). Throws on send failure so the
+ * caller can report it to the user (unlike the fire-and-forget OTP path).
+ */
+export const emailSaleInvoice = async (id: string, email: string) => {
+  const invoice = await getSaleInvoice(id);
+  const branding = await getReportBranding();
+  const html = renderInvoiceHtml(invoice, branding);
+  const pdf = await htmlToPdf(html, { footerHtml: INVOICE_FOOTER_HTML });
+
+  // Route replies to the shop's contact inbox (if configured), so a customer
+  // replying to the invoice reaches the shop rather than the no-reply sender.
+  const replyTo = (invoice.company as { email?: string }).email?.trim() || undefined;
+
+  const sent = await sendInvoiceEmail({
+    to: email,
+    invoiceNo: invoice.invoiceNo,
+    shopName: branding.shopName,
+    grandTotal: invoice.grandTotal,
+    replyTo,
+    pdf,
+  });
+  if (!sent) {
+    throw new AppError(
+      502,
+      'EMAIL_SEND_FAILED',
+      'Could not send the invoice email. Please check the address and try again.',
+    );
+  }
+
+  return { email, invoiceNo: invoice.invoiceNo };
 };

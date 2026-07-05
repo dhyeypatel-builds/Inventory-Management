@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   listInventory,
   getInventoryItem,
+  getValuation,
   updateInventory,
   adjustStock,
   listMovements,
@@ -13,6 +14,7 @@ export const inventoryKeys = {
   all: ['inventory'] as const,
   list: (params: ListInventoryParams) => ['inventory', 'list', params] as const,
   detail: (variantId: string) => ['inventory', 'detail', variantId] as const,
+  valuation: ['inventory', 'valuation'] as const,
   movements: (variantId: string, page: number) =>
     ['inventory', 'movements', variantId, page] as const,
 };
@@ -21,6 +23,14 @@ export function useInventory(params: ListInventoryParams = {}) {
   return useQuery({
     queryKey: inventoryKeys.list(params),
     queryFn: () => listInventory(params),
+    staleTime: 30_000,
+  });
+}
+
+export function useValuation() {
+  return useQuery({
+    queryKey: inventoryKeys.valuation,
+    queryFn: getValuation,
     staleTime: 30_000,
   });
 }

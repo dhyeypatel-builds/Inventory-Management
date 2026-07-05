@@ -2,10 +2,16 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PosPage } from './pages/PosPage';
+import { AuthProvider } from '@/app/providers';
 import { Toaster } from '@/shared/ui/toaster';
+import { seedAuthedSession } from '../../../test/fixtures';
 import * as salesApi from './api/sales.api';
 
 jest.mock('./api/sales.api');
+// POS reads shop settings to know VAT registration; default to registered.
+jest.mock('@/features/settings/hooks/useSettings', () => ({
+  useSettings: () => ({ data: { tax: { vat_registered: true } } }),
+}));
 jest.mock('react-router', () => ({
   ...jest.requireActual('react-router'),
   useNavigate: () => jest.fn(),
@@ -59,8 +65,10 @@ function renderPos() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <PosPage />
-      <Toaster />
+      <AuthProvider>
+        <PosPage />
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>,
   );
 }
@@ -71,10 +79,14 @@ beforeEach(() => {
     meta: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
   });
   mockCreateSale.mockResolvedValue(mockSale);
+  // POS reads the current user for the price-override gate; seed a basic till
+  // session (no override permission) so the cart matches normal cashier use.
+  seedAuthedSession({ permissions: ['sale:read', 'sale:create'] });
 });
 
 afterEach(() => {
   jest.resetAllMocks();
+  localStorage.clear();
 });
 
 describe('PosPage — cart math', () => {

@@ -20,8 +20,18 @@ export class DevEmailTransport implements EmailTransport {
     const file = join(this.dir, `${stamp}__${safeTo}.html`);
     await writeFile(file, message.html, 'utf8');
 
+    // Persist attachments next to the HTML so the full flow (e.g. invoice PDF)
+    // can be inspected locally without an SMTP provider.
+    const attachmentFiles: string[] = [];
+    for (const att of message.attachments ?? []) {
+      const safeName = att.filename.replace(/[^a-z0-9._-]/gi, '_');
+      const attFile = join(this.dir, `${stamp}__${safeTo}__${safeName}`);
+      await writeFile(attFile, att.content);
+      attachmentFiles.push(attFile);
+    }
+
     logger.info(
-      { to: message.to, subject: message.subject, file },
+      { to: message.to, subject: message.subject, file, attachments: attachmentFiles },
       '📧 [dev email] written to disk',
     );
   }

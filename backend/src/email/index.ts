@@ -6,6 +6,7 @@ import { SmtpEmailTransport } from './transports/smtp';
 import { renderOtpEmail, type OtpTemplateInput } from './templates/otp';
 import { renderInviteEmail, type InviteTemplateInput } from './templates/invite';
 import { renderWelcomeEmail, type WelcomeTemplateInput } from './templates/welcome';
+import { renderInvoiceEmail, type InvoiceTemplateInput } from './templates/invoice';
 
 let transport: EmailTransport | null = null;
 
@@ -47,5 +48,8 @@ export const sendInviteEmail = (input: InviteTemplateInput): Promise<boolean> =>
 
 export const sendWelcomeEmail = (input: WelcomeTemplateInput): Promise<boolean> =>
   sendEmail(renderWelcomeEmail(input));
+
+export const sendInvoiceEmail = (input: InvoiceTemplateInput): Promise<boolean> =>
+  sendEmail(renderInvoiceEmail(input));
 
 export type { EmailMessage, EmailTransport } from './types';

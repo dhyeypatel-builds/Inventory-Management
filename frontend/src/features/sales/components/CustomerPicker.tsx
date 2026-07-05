@@ -2,20 +2,20 @@ import { useState, useRef, useEffect } from 'react';
 import { User, UserPlus, X } from 'lucide-react';
 import { Input } from '@/shared/ui/input';
 import { Button } from '@/shared/ui/button';
-import { toast } from '@/shared/ui/use-toast';
 import { useCustomerSearch } from '../hooks/useSales';
-import { createCustomer } from '../api/sales.api';
 import type { Customer } from '../types';
 
 interface CustomerPickerProps {
   selected: Customer | null;
+  /** A walk-in buyer name that is NOT yet saved as a customer. */
+  walkInName: string | null;
   onSelect: (customer: Customer | null) => void;
+  onWalkIn: (name: string | null) => void;
 }
 
-export function CustomerPicker({ selected, onSelect }: CustomerPickerProps) {
+export function CustomerPicker({ selected, walkInName, onSelect, onWalkIn }: CustomerPickerProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const { data } = useCustomerSearch(query, query.length >= 2);
@@ -23,22 +23,6 @@ export function CustomerPicker({ selected, onSelect }: CustomerPickerProps) {
 
   const trimmed = query.trim();
   const exactMatch = results.some((c) => c.name.toLowerCase() === trimmed.toLowerCase());
-
-  async function handleCreate() {
-    if (!trimmed || creating) return;
-    setCreating(true);
-    try {
-      const customer = await createCustomer({ name: trimmed });
-      toast({ title: `Customer "${customer.name}" added`, variant: 'success' });
-      onSelect(customer);
-      setQuery('');
-      setOpen(false);
-    } catch {
-      toast({ title: 'Could not add customer', variant: 'destructive' });
-    } finally {
-      setCreating(false);
-    }
-  }
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -50,6 +34,7 @@ export function CustomerPicker({ selected, onSelect }: CustomerPickerProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // A saved customer is linked.
   if (selected) {
     return (
       <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
@@ -62,12 +47,25 @@ export function CustomerPicker({ selected, onSelect }: CustomerPickerProps) {
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onSelect(null)}
-          aria-label="Remove customer"
-        >
+        <Button variant="ghost" size="sm" onClick={() => onSelect(null)} aria-label="Remove customer">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
+
+  // A walk-in name (not saved). Offered for saving after the sale completes.
+  if (walkInName) {
+    return (
+      <div className="flex items-center justify-between rounded-md border border-dashed px-3 py-2 text-sm">
+        <div className="flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <div className="font-medium">{walkInName}</div>
+            <div className="text-xs italic text-muted-foreground">Walk-in customer</div>
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => onWalkIn(null)} aria-label="Remove walk-in">
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -79,7 +77,7 @@ export function CustomerPicker({ selected, onSelect }: CustomerPickerProps) {
       <div className="relative">
         <User className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search customer (optional)…"
+          placeholder="Search or name a walk-in (optional)…"
           className="pl-8"
           value={query}
           onChange={(e) => {
@@ -110,22 +108,24 @@ export function CustomerPicker({ selected, onSelect }: CustomerPickerProps) {
               }}
             >
               <span className="font-medium">{c.name}</span>
-              {c.phone && (
-                <span className="text-xs text-muted-foreground">{c.phone}</span>
-              )}
+              {c.phone && <span className="text-xs text-muted-foreground">{c.phone}</span>}
             </button>
           ))}
 
-          {/* Walk-in customers get created on the spot — never lose the name off an invoice */}
+          {/* Walk-in: capture the name on the invoice without saving a customer.
+              After the sale you're asked whether to save them. */}
           {!exactMatch && trimmed.length >= 2 && (
             <button
               type="button"
               className="flex w-full items-center gap-2 border-t border-border px-4 py-2.5 text-left text-sm font-medium text-primary hover:bg-accent"
-              onClick={handleCreate}
-              disabled={creating}
+              onClick={() => {
+                onWalkIn(trimmed);
+                setQuery('');
+                setOpen(false);
+              }}
             >
               <UserPlus className="h-4 w-4 shrink-0" />
-              {creating ? 'Adding…' : `Add "${trimmed}" as new customer`}
+              {`Use "${trimmed}" as walk-in`}
             </button>
           )}
 

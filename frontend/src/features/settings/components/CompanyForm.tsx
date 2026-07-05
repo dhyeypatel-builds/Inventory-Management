@@ -16,6 +16,7 @@ import type { Settings } from '../types';
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required').max(160),
   phone: z.string().max(20).optional().or(z.literal('')),
+  email: z.string().email('Enter a valid email address').max(160).optional().or(z.literal('')),
   address: z.string().max(500).optional().or(z.literal('')),
   vat_number: z.string().max(20).optional().or(z.literal('')),
 });
@@ -52,13 +53,14 @@ export function CompanyForm({ settings }: { settings: Settings }) {
     formState: { errors, isSubmitting },
   } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: { name: '', phone: '', address: '', vat_number: '' },
+    defaultValues: { name: '', phone: '', email: '', address: '', vat_number: '' },
   });
 
   useEffect(() => {
     reset({
       name: settings.company?.name ?? '',
       phone: settings.company?.phone ?? '',
+      email: settings.company?.email ?? '',
       address: settings.company?.address ?? '',
       vat_number: settings.company?.vat_number ?? '',
     });
@@ -70,6 +72,7 @@ export function CompanyForm({ settings }: { settings: Settings }) {
         company: {
           name: values.name,
           phone: values.phone || undefined,
+          email: values.email || undefined,
           address: values.address || undefined,
           vat_number: values.vat_number || undefined,
         },
@@ -146,6 +149,25 @@ export function CompanyForm({ settings }: { settings: Settings }) {
             {...register('vat_number')}
           />
         </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="company-email">Contact Email</Label>
+        <Input
+          id="company-email"
+          type="email"
+          inputMode="email"
+          placeholder="shop@example.com"
+          {...register('email')}
+          aria-invalid={!!errors.email}
+        />
+        {errors.email ? (
+          <p className="text-xs text-destructive">{errors.email.message}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Where customer replies to invoice emails are sent.
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5">

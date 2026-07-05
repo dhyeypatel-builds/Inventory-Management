@@ -31,6 +31,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-tyrestock}
       NODE_ENV: production
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -45,25 +47,15 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    # Direct host access (bypasses Traefik): http://localhost:${FRONTEND_PORT:-8080}
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     networks:
-      - web
       - app-net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.rule=Host(`${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.entrypoints=websecure"
-      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.tls=true"
-      - "traefik.http.routers.${TRAEFIK_ROUTER:-tyrestock}.tls.certresolver=letsencrypt"
-      - "traefik.http.services.${TRAEFIK_ROUTER:-tyrestock}.loadbalancer.server.port=80"
 
 volumes:
   postgres_data:
+  uploads_data:
 
 networks:
   app-net:
     driver: bridge
-  web:
-    external: true

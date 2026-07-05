@@ -74,3 +74,14 @@ export const getInvoice = async (req: Request, res: Response, next: NextFunction
     next(err);
   }
 };
+
+export const emailInvoice = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const result = await salesService.emailSaleInvoice(sid(req), req.body.email);
+    res.locals.auditAfter = { id: sid(req), email: result.email };
+    res.locals.auditEntityId = sid(req);
+    success(res, result);
+  } catch (err) {
+    next(err);
+  }
+};

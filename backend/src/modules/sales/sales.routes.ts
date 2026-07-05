@@ -3,7 +3,13 @@ import { authenticate } from '../../middleware/auth';
 import { requirePermission } from '../../middleware/rbac';
 import { validate } from '../../middleware/validate';
 import { auditLog } from '../../middleware/audit';
-import { createSaleSchema, saleIdSchema, listSalesQuerySchema, returnSaleSchema } from './sales.schema';
+import {
+  createSaleSchema,
+  saleIdSchema,
+  listSalesQuerySchema,
+  returnSaleSchema,
+  emailInvoiceSchema,
+} from './sales.schema';
 import * as salesController from './sales.controller';
 
 // ─── /api/v1/sales ──────────────────────────────────────────────────────────
@@ -39,6 +45,14 @@ salesRouter.get(
   requirePermission('sale:read'),
   validate({ params: saleIdSchema }),
   salesController.getInvoice,
+);
+
+salesRouter.post(
+  '/:id/invoice/email',
+  requirePermission('sale:read'),
+  validate({ params: saleIdSchema, body: emailInvoiceSchema }),
+  auditLog('sale'),
+  salesController.emailInvoice,
 );
 
 salesRouter.post(

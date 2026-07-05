@@ -5,6 +5,7 @@ import type {
   MovementsResponse,
   AdjustStockInput,
   UpdateInventoryInput,
+  Valuation,
 } from '../types';
 
 export interface ListInventoryParams {
@@ -13,6 +14,12 @@ export interface ListInventoryParams {
   rack?: string;
   page?: number;
   pageSize?: number;
+}
+
+/** Total cost value of stock on hand, with brand/category breakdowns. */
+export async function getValuation(): Promise<Valuation> {
+  const res = await api.get('/inventory/valuation');
+  return res.data.data as Valuation;
 }
 
 export async function listInventory(params: ListInventoryParams = {}): Promise<InventoryListResponse> {

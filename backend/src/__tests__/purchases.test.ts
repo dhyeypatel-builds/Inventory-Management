@@ -47,7 +47,7 @@ beforeAll(async () => {
     .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
   accessToken = loginRes.body.data.accessToken as string;
 
-  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Car Tyre' } });
+  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Tyre' } });
   productTypeId = carTyre.id;
   const brand = await prisma.brand.findFirstOrThrow({ where: { deletedAt: null } });
   brandId = brand.id;

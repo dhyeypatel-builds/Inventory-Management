@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { isAxiosError } from 'axios';
-import { Banknote, CreditCard, Smartphone, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Banknote, CreditCard, Smartphone, AlertTriangle } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Label } from '@/shared/ui/label';
 import { Separator } from '@/shared/ui/separator';
@@ -8,9 +8,11 @@ import { cn } from '@/shared/lib/cn';
 import { ItemSearch } from '../components/ItemSearch';
 import { Cart, computeTotals } from '../components/Cart';
 import { CustomerPicker } from '../components/CustomerPicker';
-import { InvoiceView } from '../components/InvoiceView';
+import { SaleComplete } from '../components/SaleComplete';
 import { useCreateSale, useSaleInvoice } from '../hooks/useSales';
 import { formatCurrency } from '@/shared/lib/currency';
+import { useAuth } from '@/app/providers';
+import { useSettings } from '@/features/settings/hooks/useSettings';
 import { toast } from '@/shared/ui/use-toast';
 import type { CartItem, VariantSearchResult, Customer, SaleDetail, PaymentMode } from '../types';
 
@@ -27,6 +29,8 @@ function generateIdempotencyKey(): string {
 export function PosPage() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
+  // A walk-in buyer name typed at the till but not saved as a customer.
+  const [walkInName, setWalkInName] = useState<string | null>(null);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
   const [stockError, setStockError] = useState<string | null>(null);
   const [completedSale, setCompletedSale] = useState<SaleDetail | null>(null);
@@ -35,6 +39,12 @@ export function PosPage() {
   const idempotencyKeyRef = useRef(generateIdempotencyKey());
 
   const createSale = useCreateSale();
+  // Price overrides at the till are an ADMIN-gated permission (fraud vector).
+  const { user } = useAuth();
+  const canOverridePrice = user?.permissions.includes('sale:override_price') ?? false;
+  // VAT is only charged when the shop is registered (mirrors the server rule).
+  const { data: settings } = useSettings();
+  const vatRegistered = settings?.tax?.vat_registered !== false;
   // Company header for the printable invoice (only fetched once a sale completes)
   const { data: invoicePayload } = useSaleInvoice(completedSale?.id ?? '');
 
@@ -54,6 +64,7 @@ export function PosPage() {
           description: `${variant.productName} (${variant.sku})`,
           quantity: 1,
           unitPrice: variant.sellingPrice,
+          listPrice: variant.sellingPrice,
           discount: 0,
           taxRatePct: variant.taxRatePct,
         },
@@ -71,6 +82,12 @@ export function PosPage() {
   const changeDiscount = useCallback((variantId: string, discount: number) => {
     setCartItems((prev) =>
       prev.map((i) => (i.variantId === variantId ? { ...i, discount } : i)),
+    );
+  }, []);
+
+  const changePrice = useCallback((variantId: string, unitPrice: number) => {
+    setCartItems((prev) =>
+      prev.map((i) => (i.variantId === variantId ? { ...i, unitPrice } : i)),
     );
   }, []);
 
@@ -92,6 +109,8 @@ export function PosPage() {
       const sale = await createSale.mutateAsync({
         payload: {
           customerId: customer?.id,
+          // Walk-in name only matters when there's no linked customer.
+          ...(!customer && walkInName ? { customerName: walkInName } : {}),
           paymentMode,
           items: cartItems.map((i) => {
             const serials = (i.serialsText ?? '')
@@ -113,6 +132,7 @@ export function PosPage() {
       setCompletedSale(sale);
       setCartItems([]);
       setCustomer(null);
+      setWalkInName(null);
       setPaymentMode('CASH');
       idempotencyKeyRef.current = generateIdempotencyKey();
     } catch (err) {
@@ -141,27 +161,15 @@ export function PosPage() {
     }
   }
 
-  const totals = computeTotals(cartItems);
+  const totals = computeTotals(cartItems, vatRegistered);
 
   if (completedSale) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-sm bg-success/12 text-[oklch(0.45_0.13_150)]">
-              <CheckCircle2 className="h-5 w-5" />
-            </span>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Sale Complete</h1>
-              <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
-                Invoice generated
-              </p>
-            </div>
-          </div>
-          <Button onClick={() => setCompletedSale(null)}>New Sale</Button>
-        </div>
-        <InvoiceView sale={completedSale} company={invoicePayload?.company} />
-      </div>
+      <SaleComplete
+        sale={completedSale}
+        company={invoicePayload?.company}
+        onNewSale={() => setCompletedSale(null)}
+      />
     );
   }
 
@@ -183,6 +191,8 @@ export function PosPage() {
             onChangeQty={changeQty}
             onChangeDiscount={changeDiscount}
             onChangeSerials={changeSerials}
+            onChangePrice={canOverridePrice ? changePrice : undefined}
+            vatRegistered={vatRegistered}
             onRemove={removeItem}
           />
         </div>
@@ -197,7 +207,15 @@ export function PosPage() {
 
             <div className="space-y-1.5">
               <Label>Customer (optional)</Label>
-              <CustomerPicker selected={customer} onSelect={setCustomer} />
+              <CustomerPicker
+                selected={customer}
+                walkInName={walkInName}
+                onSelect={(c) => {
+                  setCustomer(c);
+                  if (c) setWalkInName(null);
+                }}
+                onWalkIn={setWalkInName}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -242,12 +260,14 @@ export function PosPage() {
                   <span className="font-mono tabular">−{formatCurrency(totals.discount)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Tax</span>
-                <span className="font-mono tabular">
-                  {totals.taxTotal > 0 ? formatCurrency(totals.taxTotal) : '—'}
-                </span>
-              </div>
+              {vatRegistered && (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Tax</span>
+                  <span className="font-mono tabular">
+                    {totals.taxTotal > 0 ? formatCurrency(totals.taxTotal) : '—'}
+                  </span>
+                </div>
+              )}
               <div className="flex items-end justify-between border-t border-border pt-2.5">
                 <span className="text-sm font-semibold">Grand Total</span>
                 <span className="font-mono tabular text-2xl font-bold leading-none tracking-tight">

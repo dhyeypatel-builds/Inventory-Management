@@ -4,7 +4,7 @@
  * Prerequisites:
  *   docker compose -f docker-compose.dev.yml up -d
  *   npx prisma migrate deploy
- *   npx prisma db seed   ← creates ADMIN role, Car Tyre product type, 6 brands
+ *   npx prisma db seed   ← creates ADMIN role, Tyre product type, 6 brands
  */
 
 import request from 'supertest';
@@ -49,7 +49,7 @@ beforeAll(async () => {
   accessToken = loginRes.body.data.accessToken as string;
 
   // Resolve seeded reference data
-  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Car Tyre' } });
+  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Tyre' } });
   productTypeId = carTyre.id;
 
   const mrf = await prisma.brand.findFirstOrThrow({ where: { name: 'MRF', deletedAt: null } });
@@ -91,7 +91,7 @@ const SRS_PRODUCT = {
     attributes: {
       size: '195/65 R15',
       tyre_type: 'Tubeless',
-      vehicle_type: 'Sedan',
+      position: 'Universal',
     },
     openingStock: 20,
     rackLocation: 'Rack A-12',
@@ -120,7 +120,7 @@ describe('POST /api/v1/products', () => {
     expect(p.name).toBe('MRF ZLX');
     expect(p.warrantyMonths).toBe(60);
     expect(p.brand.name).toBe('MRF');
-    expect(p.productType.name).toBe('Car Tyre');
+    expect(p.productType.name).toBe('Tyre');
 
     // Variant present with resolved attribute values
     expect(p.variants).toHaveLength(1);
@@ -129,7 +129,7 @@ describe('POST /api/v1/products', () => {
     expect(Number(v.sellingPrice)).toBe(4800);
     expect(v.attributeValues.size).toBe('195/65 R15');
     expect(v.attributeValues.tyre_type).toBe('Tubeless');
-    expect(v.attributeValues.vehicle_type).toBe('Sedan');
+    expect(v.attributeValues.position).toBe('Universal');
 
     // Opening inventory
     expect(v.inventory.quantity).toBe(20);
@@ -169,7 +169,7 @@ describe('POST /api/v1/products', () => {
         sellingPrice: 1200,
         attributes: {
           // size and tyre_type are required — omitting them
-          vehicle_type: 'Sedan',
+          position: 'Universal',
         },
         openingStock: 0,
       },

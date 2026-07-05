@@ -5,9 +5,17 @@ const PHONE_REGEX = /^\+?[0-9]{7,15}$/;
 // UK VAT registration number: GB followed by 9 digits (standard) or 12 digits (branch).
 const VAT_REGEX = /^GB[0-9]{9}([0-9]{3})?$/;
 
+// Strip the spaces, hyphens and brackets people naturally type in a phone
+// number (e.g. "+91 6353873229", "(0161) 555-1234") before validating.
+const normalizePhone = (v: unknown): unknown =>
+  typeof v === 'string' ? v.replace(/[\s()-]/g, '') : v;
+
 export const createCustomerSchema = z.object({
   name: z.string().min(1).max(120),
-  phone: z.string().regex(PHONE_REGEX, 'Invalid phone number').optional().nullable(),
+  phone: z
+    .preprocess(normalizePhone, z.string().regex(PHONE_REGEX, 'Invalid phone number'))
+    .optional()
+    .nullable(),
   email: z.string().email().optional().nullable(),
   vatNumber: z.string().regex(VAT_REGEX, 'Invalid VAT number (e.g. GB123456789)').optional().nullable(),
   address: z.string().max(500).optional().nullable(),

@@ -4,7 +4,7 @@
  * Prerequisites:
  *   docker compose -f docker-compose.dev.yml up -d
  *   npx prisma migrate deploy
- *   npx prisma db seed   ← creates ADMIN role, Car Tyre product type, 6 brands
+ *   npx prisma db seed   ← creates ADMIN role, Tyre product type, 6 brands
  */
 
 import request from 'supertest';
@@ -82,7 +82,7 @@ beforeAll(async () => {
     .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
   accessToken = loginRes.body.data.accessToken as string;
 
-  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Car Tyre' } });
+  const carTyre = await prisma.productType.findUniqueOrThrow({ where: { name: 'Tyre' } });
   productTypeId = carTyre.id;
   const mrf = await prisma.brand.findFirstOrThrow({ where: { name: 'MRF', deletedAt: null } });
   brandId = mrf.id;

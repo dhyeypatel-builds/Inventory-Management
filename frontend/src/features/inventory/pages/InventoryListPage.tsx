@@ -9,7 +9,8 @@ import { EmptyState } from '@/shared/ui/empty-state';
 import { InventoryTable } from '../components/InventoryTable';
 import { AdjustStockDialog } from '../components/AdjustStockDialog';
 import { MovementLedgerDrawer } from '../components/MovementLedgerDrawer';
-import { useInventory } from '../hooks/useInventory';
+import { useInventory, useValuation } from '../hooks/useInventory';
+import { formatCurrency } from '@/shared/lib/currency';
 import type { InventoryItem } from '../types';
 
 export function InventoryListPage() {
@@ -29,6 +30,10 @@ export function InventoryListPage() {
     page,
     pageSize: 20,
   });
+
+  // Whole-shop stock valuation (independent of the search/low-stock filters).
+  const { data: valuation } = useValuation();
+  const totalUnits = valuation?.byBrand.reduce((sum, b) => sum + b.totalQty, 0) ?? 0;
 
   const meta = data?.meta;
 
@@ -51,6 +56,21 @@ export function InventoryListPage() {
             Stock on hand
           </p>
         </div>
+
+        {/* Whole-shop stock valuation (at cost price) */}
+        {valuation && (
+          <div className="rounded-sm border border-border bg-card px-4 py-2.5 text-right shadow-panel">
+            <div className="font-mono text-[0.6rem] uppercase tracking-[0.14em] text-muted-foreground">
+              Stock value · at cost
+            </div>
+            <div className="mt-0.5 font-mono tabular text-xl font-bold leading-none">
+              {formatCurrency(valuation.totalValue)}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {totalUnits.toLocaleString()} {totalUnits === 1 ? 'unit' : 'units'} on hand
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

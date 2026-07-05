@@ -152,7 +152,7 @@ describe('POST /api/v1/platform/tenants (provision)', () => {
       prismaBase.user.findUniqueOrThrow({ where: { email: `${slug}@owner.test` } }),
     ]);
     expect(brands).toBe(6);
-    expect(settings).toBe(6);
+    expect(settings).toBe(7);
     expect(invites).toBe(1);
     expect(owner.tenantId).toBe(tenantId);
     expect(owner.passwordHash).toBeNull(); // passwordless until invite accepted
@@ -250,7 +250,7 @@ describe('impersonation', () => {
     const authA = { Authorization: `Bearer ${tokenA}` };
 
     // Seed a product into tenant A *through* the impersonation session.
-    const productType = await prismaBase.productType.findFirstOrThrow({ where: { name: 'Car Tyre' } });
+    const productType = await prismaBase.productType.findFirstOrThrow({ where: { name: 'Tyre' } });
     const create = await request(app)
       .post('/api/v1/products')
       .set(authA)

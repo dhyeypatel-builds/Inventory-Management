@@ -19,7 +19,7 @@ const mockListBrands = jest.mocked(productsApi.listBrands);
 const mockListCategories = jest.mocked(productsApi.listCategories);
 const mockCreateProduct = jest.mocked(productsApi.createProduct);
 
-const carTyreType = { id: 1, name: 'Car Tyre', isStockable: true, isActive: true };
+const carTyreType = { id: 1, name: 'Tyre', isStockable: true, isActive: true };
 
 const tyreAttributes = [
   {
@@ -88,10 +88,10 @@ describe('ProductForm', () => {
     // Wait for the product type select to populate
     await waitFor(() => expect(mockListTypes).toHaveBeenCalled());
 
-    // Open the product type select and choose Car Tyre
+    // Open the product type select and choose Tyre
     const typeSelect = await screen.findByRole('combobox', { name: /product type/i });
     await user.click(typeSelect);
-    await user.click(await screen.findByRole('option', { name: /car tyre/i }));
+    await user.click(await screen.findByRole('option', { name: /^tyre$/i }));
 
     // Attributes should now appear (Size and Tyre Type)
     expect(await screen.findByLabelText(/size/i)).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('ProductForm', () => {
     await waitFor(() => expect(mockListTypes).toHaveBeenCalled());
     const typeSelect = await screen.findByRole('combobox', { name: /product type/i });
     await user.click(typeSelect);
-    await user.click(await screen.findByRole('option', { name: /car tyre/i }));
+    await user.click(await screen.findByRole('option', { name: /^tyre$/i }));
 
     // Fill in product name and SKU but skip required attributes
     await user.type(await screen.findByLabelText(/product name/i), 'MRF ZTX 195/65R15');
@@ -133,7 +133,7 @@ describe('ProductForm', () => {
     await waitFor(() => expect(mockListTypes).toHaveBeenCalled());
     const typeSelect = await screen.findByRole('combobox', { name: /product type/i });
     await user.click(typeSelect);
-    await user.click(await screen.findByRole('option', { name: /car tyre/i }));
+    await user.click(await screen.findByRole('option', { name: /^tyre$/i }));
 
     // Fill required product fields
     await user.type(await screen.findByLabelText(/product name/i), 'MRF ZTX 195/65R15');

@@ -4,7 +4,7 @@
  * Prerequisites:
  *   docker compose -f docker-compose.dev.yml up -d
  *   npx prisma migrate deploy
- *   npx prisma db seed        ← creates ADMIN role, 6 brands, 8 categories, Car Tyre type
+ *   npx prisma db seed        ← creates ADMIN role, 6 brands, 8 categories, Tyre type
  */
 
 import request from 'supertest';
@@ -307,9 +307,9 @@ describe('GET /api/v1/product-types', () => {
     const res = await request(app).get('/api/v1/product-types').set(auth());
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.data)).toBe(true);
-    // Seed has "Car Tyre"
+    // Seed has "Tyre"
     const names = (res.body.data as { name: string }[]).map((t) => t.name);
-    expect(names).toContain('Car Tyre');
+    expect(names).toContain('Tyre');
   });
 
   it('returns 401 without token', async () => {
@@ -319,8 +319,8 @@ describe('GET /api/v1/product-types', () => {
 });
 
 describe('GET /api/v1/product-types/:id/attributes', () => {
-  it('returns Car Tyre attributes ordered by displayOrder', async () => {
-    const type = await prisma.productType.findUniqueOrThrow({ where: { name: 'Car Tyre' } });
+  it('returns Tyre attributes ordered by displayOrder', async () => {
+    const type = await prisma.productType.findUniqueOrThrow({ where: { name: 'Tyre' } });
 
     const res = await request(app)
       .get(`/api/v1/product-types/${type.id}/attributes`)
@@ -336,8 +336,8 @@ describe('GET /api/v1/product-types/:id/attributes', () => {
       options: { value: string }[];
     }[];
 
-    // 6 attributes from seed
-    expect(attrs.length).toBe(6);
+    // 5 attributes from seed
+    expect(attrs.length).toBe(5);
 
     // ordered by displayOrder
     for (let i = 1; i < attrs.length; i++) {

@@ -65,6 +65,15 @@ export async function cancelSale(id: string): Promise<SaleDetail> {
   return res.data.data as SaleDetail;
 }
 
+/** Emails the sale's branded invoice PDF to an address. */
+export async function emailInvoice(
+  id: string,
+  email: string,
+): Promise<{ email: string; invoiceNo: string }> {
+  const res = await api.post(`/sales/${id}/invoice/email`, { email });
+  return res.data.data as { email: string; invoiceNo: string };
+}
+
 // ─── Customers (for CustomerPicker) ──────────────────────────────────────────
 
 export async function searchCustomers(q: string): Promise<CustomerListResponse> {
@@ -72,8 +81,12 @@ export async function searchCustomers(q: string): Promise<CustomerListResponse> 
   return { customers: res.data.data, meta: res.data.meta } as CustomerListResponse;
 }
 
-/** Creates a walk-in customer from the POS picker so the sale is never left unlinked. */
-export async function createCustomer(data: { name: string; phone?: string }): Promise<Customer> {
+/** Saves a customer (e.g. converting a walk-in after a sale completes). */
+export async function createCustomer(data: {
+  name: string;
+  phone?: string;
+  email?: string;
+}): Promise<Customer> {
   const res = await api.post('/customers', data);
   return res.data.data as Customer;
 }

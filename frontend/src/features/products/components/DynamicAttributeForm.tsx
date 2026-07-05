@@ -1,6 +1,7 @@
 import { useFormContext, Controller } from 'react-hook-form';
 import { Label } from '@/shared/ui/label';
 import { Input } from '@/shared/ui/input';
+import { DatePicker } from '@/shared/ui/date-picker';
 import { Checkbox } from '@/shared/ui/checkbox';
 import {
   Select,
@@ -99,12 +100,17 @@ export function DynamicAttributeForm({
             )}
 
             {attr.datatype === 'DATE' && (
-              <Input
-                id={fieldName}
-                type="date"
-                {...register(fieldName, {
-                  required: attr.isRequired ? `${attr.label} is required` : false,
-                })}
+              <Controller
+                control={control}
+                name={fieldName}
+                rules={{ required: attr.isRequired ? `${attr.label} is required` : false }}
+                render={({ field }) => (
+                  <DatePicker
+                    id={fieldName}
+                    value={(field.value as string) ?? ''}
+                    onChange={field.onChange}
+                  />
+                )}
               />
             )}
 

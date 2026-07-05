@@ -252,7 +252,7 @@ model Category {
 
 model ProductType {
   id          Int         @id @default(autoincrement())
-  name        String      @unique               // 'Car Tyre', 'Alloy Wheel', 'Service'
+  name        String      @unique               // 'Tyre', 'Alloy Wheel', 'Service'
   isStockable Boolean     @default(true)        @map("is_stockable")
   isActive    Boolean     @default(true)        @map("is_active")
   attributes  Attribute[]
@@ -265,7 +265,7 @@ model Attribute {
   id                Int                    @id @default(autoincrement())
   productTypeId     Int                    @map("product_type_id")
   productType       ProductType            @relation(fields: [productTypeId], references: [id])
-  code              String                 // 'size', 'tyre_type', 'vehicle_type'
+  code              String                 // 'size', 'tyre_type', 'position'
   label             String
   datatype          AttributeDatatype
   isRequired        Boolean                @default(false) @map("is_required")
@@ -436,6 +436,10 @@ model Sale {
   invoiceNo      String     @map("invoice_no")            // INV-2026-000001
   customerId     String?    @map("customer_id")
   customer       Customer?  @relation(fields: [customerId], references: [id])
+  // Snapshot of the buyer for walk-ins (no Customer row). For a linked customer
+  // these mirror the customer's name/email at sale time so the invoice is stable.
+  customerName   String?    @map("customer_name")
+  customerEmail  String?    @map("customer_email")
   status         SaleStatus @default(CONFIRMED)
   subtotal       Decimal    @default(0)                    @db.Decimal(12, 2)
   discount       Decimal    @default(0)                    @db.Decimal(12, 2)
@@ -467,6 +471,7 @@ model SaleItem {
   description String                                  // snapshot: "MRF ZLX 195/65 R15 Tubeless"
   quantity    Int
   unitPrice   Decimal        @map("unit_price")       @db.Decimal(12, 2)
+  listPrice   Decimal?       @map("list_price")       @db.Decimal(12, 2) // catalogue price at sale time; differs from unitPrice on a manual override
   discount    Decimal        @default(0)              @db.Decimal(12, 2)
   taxRatePct  Decimal        @default(0) @map("tax_rate_pct") @db.Decimal(5, 2)
   lineTotal   Decimal        @map("line_total")       @db.Decimal(12, 2)

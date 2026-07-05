@@ -55,8 +55,8 @@ export async function runDemoSeed(createdBy: string): Promise<DemoSeedResult> {
   const existing = await prisma.product.count({ where: { description: DEMO_TAG } });
   if (existing > 0) return { seeded: false, products: 0, customers: 0 };
 
-  const productType = await prisma.productType.findFirst({ where: { name: 'Car Tyre' } });
-  if (!productType) throw new NotFoundError('Car Tyre product type');
+  const productType = await prisma.productType.findFirst({ where: { name: 'Tyre' } });
+  if (!productType) throw new NotFoundError('Tyre product type');
 
   const brands = await prisma.brand.findMany();
   const brandId = (name: string): number | undefined => brands.find((b) => b.name === name)?.id;

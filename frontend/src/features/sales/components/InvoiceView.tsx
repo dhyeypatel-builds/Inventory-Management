@@ -3,6 +3,7 @@ import { Button } from '@/shared/ui/button';
 import { Badge } from '@/shared/ui/badge';
 import { formatCurrency } from '@/shared/lib/currency';
 import { formatDate } from '@/shared/lib/dates';
+import { useSettings } from '@/features/settings/hooks/useSettings';
 import type { SaleDetail, InvoiceCompany } from '../types';
 
 interface InvoiceViewProps {
@@ -19,9 +20,30 @@ const STATUS_VARIANT = {
   DRAFT: 'secondary',
 } as const;
 
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** Net taxable + VAT grouped by rate (highest first), mirroring the PDF. */
+function taxBreakdown(items: SaleDetail['items']): { rate: number; net: number; vat: number }[] {
+  const byRate = new Map<number, { net: number; vat: number }>();
+  for (const it of items) {
+    const net = round2(it.unitPrice * it.quantity - it.discount);
+    const vat = round2(it.lineTotal - net);
+    const acc = byRate.get(it.taxRatePct) ?? { net: 0, vat: 0 };
+    byRate.set(it.taxRatePct, { net: round2(acc.net + net), vat: round2(acc.vat + vat) });
+  }
+  return [...byRate.entries()]
+    .map(([rate, v]) => ({ rate, net: v.net, vat: v.vat }))
+    .sort((a, b) => b.rate - a.rate);
+}
+
 export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
   const co = company ?? sale.company;
-  const vatNo = co?.vat_no ?? co?.gstin;
+  const vatNo = co?.vat_number ?? co?.vat_no ?? co?.gstin;
+  // Unregistered shops present a plain "Invoice" with no VAT column/row.
+  const { data: settings } = useSettings();
+  const vatRegistered = settings?.tax?.vat_registered !== false;
+  // Net + VAT grouped by rate, for the per-rate breakdown when rates are mixed.
+  const taxByRate = vatRegistered ? taxBreakdown(sale.items) : [];
 
   return (
     <div className="print-area overflow-hidden rounded-sm border border-border bg-card text-sm shadow-panel print:border-0 print:shadow-none">
@@ -54,7 +76,9 @@ export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
 
         <div className="text-right">
           <div className="flex items-center justify-end gap-2">
-            <h2 className="text-lg font-bold tracking-tight">TAX INVOICE</h2>
+            <h2 className="text-lg font-bold tracking-tight">
+              {vatRegistered ? 'TAX INVOICE' : 'INVOICE'}
+            </h2>
             <Badge variant={STATUS_VARIANT[sale.status]}>{sale.status}</Badge>
           </div>
           <dl className="mt-1.5 space-y-0.5 font-mono text-xs text-muted-foreground">
@@ -82,9 +106,21 @@ export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
           <div className="font-mono text-[0.62rem] uppercase tracking-[0.16em] text-muted-foreground">
             Billed to
           </div>
-          <p className="mt-1 font-semibold">{sale.customer?.name ?? 'Walk-in customer'}</p>
-          {sale.customer?.phone && (
-            <p className="font-mono text-xs text-muted-foreground">{sale.customer.phone}</p>
+          {sale.customer ? (
+            <>
+              <p className="mt-1 font-semibold">{sale.customer.name}</p>
+              {sale.customer.phone && (
+                <p className="font-mono text-xs text-muted-foreground">{sale.customer.phone}</p>
+              )}
+            </>
+          ) : sale.customerName ? (
+            // Walk-in with a name: show the name above the walk-in tag.
+            <>
+              <p className="mt-1 font-semibold">{sale.customerName}</p>
+              <p className="text-xs italic text-muted-foreground">Walk-in customer</p>
+            </>
+          ) : (
+            <p className="mt-1 font-semibold">Walk-in customer</p>
           )}
         </div>
 
@@ -104,9 +140,11 @@ export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
               <th className="pb-2 text-right text-[0.62rem] font-bold uppercase tracking-wider">
                 Disc
               </th>
-              <th className="pb-2 text-right text-[0.62rem] font-bold uppercase tracking-wider">
-                Tax%
-              </th>
+              {vatRegistered && (
+                <th className="pb-2 text-right text-[0.62rem] font-bold uppercase tracking-wider">
+                  Tax%
+                </th>
+              )}
               <th className="pb-2 text-right text-[0.62rem] font-bold uppercase tracking-wider">
                 Total
               </th>
@@ -124,13 +162,20 @@ export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
                 <td className="py-2.5 text-right font-mono tabular">{item.quantity}</td>
                 <td className="py-2.5 text-right font-mono tabular">
                   {formatCurrency(item.unitPrice)}
+                  {item.listPrice != null && item.listPrice !== item.unitPrice && (
+                    <div className="text-[0.62rem] text-muted-foreground line-through">
+                      {formatCurrency(item.listPrice)}
+                    </div>
+                  )}
                 </td>
                 <td className="py-2.5 text-right font-mono tabular text-muted-foreground">
                   {item.discount > 0 ? formatCurrency(item.discount) : '—'}
                 </td>
-                <td className="py-2.5 text-right font-mono tabular text-muted-foreground">
-                  {item.taxRatePct}%
-                </td>
+                {vatRegistered && (
+                  <td className="py-2.5 text-right font-mono tabular text-muted-foreground">
+                    {item.taxRatePct}%
+                  </td>
+                )}
                 <td className="py-2.5 text-right font-mono tabular font-semibold">
                   {formatCurrency(item.lineTotal)}
                 </td>
@@ -152,10 +197,25 @@ export function InvoiceView({ sale, company, onClose }: InvoiceViewProps) {
                 <span className="font-mono tabular">−{formatCurrency(sale.discount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Tax</span>
-              <span className="font-mono tabular">{formatCurrency(sale.taxTotal)}</span>
-            </div>
+            {vatRegistered &&
+              (taxByRate.length > 1 ? (
+                taxByRate.map((b) => (
+                  <div
+                    key={b.rate}
+                    className="flex justify-between text-sm text-muted-foreground"
+                  >
+                    <span>
+                      VAT {b.rate}% on {formatCurrency(b.net)}
+                    </span>
+                    <span className="font-mono tabular">{formatCurrency(b.vat)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Tax</span>
+                  <span className="font-mono tabular">{formatCurrency(sale.taxTotal)}</span>
+                </div>
+              ))}
             <div className="mt-1 flex items-end justify-between border-t border-border pt-2.5">
               <span className="text-sm font-semibold">Grand Total</span>
               <span className="font-mono tabular text-2xl font-bold leading-none tracking-tight">

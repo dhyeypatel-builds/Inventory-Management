@@ -7,6 +7,7 @@ import {
   cancelSale,
   searchCustomers,
   getSaleInvoice,
+  emailInvoice,
   type SearchVariantsParams,
   type ListSalesParams,
 } from '../api/sales.api';
@@ -80,6 +81,12 @@ export function useCreateSale() {
       qc.invalidateQueries({ queryKey: salesKeys.all });
       qc.invalidateQueries({ queryKey: ['inventory'] });
     },
+  });
+}
+
+export function useEmailInvoice() {
+  return useMutation({
+    mutationFn: ({ id, email }: { id: string; email: string }) => emailInvoice(id, email),
   });
 }
 
