@@ -19,7 +19,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd /opt/apps/dev/Inventorry-Management
+            cd /opt/apps/dev/Inventory-Management
             git fetch origin
             git checkout dev
             git reset --hard origin/dev
